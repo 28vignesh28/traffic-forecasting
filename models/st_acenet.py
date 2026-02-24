@@ -20,7 +20,8 @@ class DynamicGraphGenerator(nn.Module):
     def forward(self, traffic, static_adj):
         # traffic    : [B, T, N, 1]
         # static_adj : [N, N]
-        state     = traffic[:, -1, :, :]                # [B, N, 1]
+        # Use temporal mean across all timesteps (not just last) for trend-aware graph
+        state     = traffic.mean(dim=1)                 # [B, N, 1]
         state_emb = torch.tanh(self.fc_embed(state))   # [B, N, embed_dim]
 
         A_dyn = torch.bmm(state_emb, state_emb.transpose(1, 2))   # [B, N, N]
@@ -56,7 +57,7 @@ class ST_ACENet(nn.Module):
       #18 — sigma is now returned to test.py where it is evaluated as
              a calibration/NLL metric alongside MAE/MSE/RMSE/MAPE.
     """
-    def __init__(self, nfeat=14, N=207, hidden_dim=64, static_adj=None):
+    def __init__(self, nfeat=10, N=207, hidden_dim=64, static_adj=None):
         super(ST_ACENet, self).__init__()
 
         if static_adj is not None:
@@ -111,7 +112,7 @@ class ST_ACENet(nn.Module):
         z            = self.fusion_fc(fusion_input) * alpha
 
         # Multi-Scale Temporal Modelling
-        z_flat  = z.view(B * N, T, -1)
+        z_flat  = z.permute(0, 2, 1, 3).contiguous().reshape(B * N, T, -1)
 
         # Short-term (Conv1d)
         z_short = z_flat.permute(0, 2, 1)

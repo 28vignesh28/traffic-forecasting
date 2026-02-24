@@ -5,7 +5,7 @@ from torch.utils.checkpoint import checkpoint
 
 
 class ContextEncoder(nn.Module):
-    def __init__(self, in_dim=13, d_model=64):
+    def __init__(self, in_dim=9, d_model=64):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(in_dim, d_model),

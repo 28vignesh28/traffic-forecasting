@@ -38,7 +38,7 @@ def test_unified_model(model_name, config_path="src/config.yaml"):
         adj_tensor = torch.FloatTensor(adj_static).to(device)
 
     nodes    = 207
-    features = 14
+    features = 10
     hidden_dim = config.get('model_defaults', {}).get('hidden_dim', 64)
     window   = config['training']['window']
     horizon  = config['training']['horizon']

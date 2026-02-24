@@ -149,7 +149,9 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
 
                 elif model_name == "ST_ACENet":
                     mu, sigma = model(x)
-                    loss      = loss_fn(mu, y, sigma ** 2)
+                    nll_loss  = loss_fn(mu, y, sigma ** 2)
+                    mae_loss  = nn.functional.l1_loss(mu, y)
+                    loss      = nll_loss + 0.5 * mae_loss  # anchor point estimate
 
             if use_amp:
                 grad_scaler.scale(loss).backward()
@@ -186,7 +188,9 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
                         loss  = loss_fn(preds, y)
                     elif model_name == "ST_ACENet":
                         mu, sigma = model(x)
-                        loss      = loss_fn(mu, y, sigma ** 2)
+                        nll_loss  = loss_fn(mu, y, sigma ** 2)
+                        mae_loss  = nn.functional.l1_loss(mu, y)
+                        loss      = nll_loss + 0.5 * mae_loss
 
                 total_val_loss += loss.item()
 

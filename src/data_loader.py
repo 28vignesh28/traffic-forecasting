@@ -88,14 +88,12 @@ def fetch_holiday_api(year=2012, country_code="US"):
 
 
 def add_time_features(timestamps, N):
-    """Generates Cyclical Time Features (Sin/Cos)."""
+    """Generates Cyclical Time Features (Sin/Cos) for Time-of-Day and Day-of-Week only."""
     logger.info("Generating Cyclical Time Features...")
     T = len(timestamps)
     
     tod = ((timestamps.hour * 60 + timestamps.minute) // 5).values  # 0 to 287
     dow = timestamps.dayofweek.values  # 0 to 6
-    day_of_month = timestamps.day.values # 1 to 31
-    month = timestamps.month.values # 1 to 12
     
     tod_sin = np.sin(2 * np.pi * tod / 288.0).reshape(-1, 1)
     tod_cos = np.cos(2 * np.pi * tod / 288.0).reshape(-1, 1)
@@ -103,14 +101,8 @@ def add_time_features(timestamps, N):
     dow_sin = np.sin(2 * np.pi * dow / 7.0).reshape(-1, 1)
     dow_cos = np.cos(2 * np.pi * dow / 7.0).reshape(-1, 1)
     
-    dom_sin = np.sin(2 * np.pi * day_of_month / 31.0).reshape(-1, 1)
-    dom_cos = np.cos(2 * np.pi * day_of_month / 31.0).reshape(-1, 1)
-    
-    mon_sin = np.sin(2 * np.pi * month / 12.0).reshape(-1, 1)
-    mon_cos = np.cos(2 * np.pi * month / 12.0).reshape(-1, 1)
-    
-    # Shape: [T, 8] -> Broadcast to [T, N, 8]
-    time_feat = np.concatenate([tod_sin, tod_cos, dow_sin, dow_cos, dom_sin, dom_cos, mon_sin, mon_cos], axis=1).astype(np.float32)
+    # Shape: [T, 4] -> Broadcast to [T, N, 4]
+    time_feat = np.concatenate([tod_sin, tod_cos, dow_sin, dow_cos], axis=1).astype(np.float32)
     time_feat = np.repeat(time_feat[:, None, :], N, axis=1)
     return time_feat
 
@@ -166,8 +158,8 @@ def merge_features(traffic, timestamps, config, train_end=None):
         std_w = np.std(weather_feat, axis=(0, 1), keepdims=True)
     weather_feat = (weather_feat - mean_w) / (std_w + 1e-5)
 
-    # 6. Concatenate 14 Complete Features
-    # [1 Traffic, 4 Weather, 1 Holiday, 8 Time]
+    # 6. Concatenate 10 Features
+    # [1 Traffic, 4 Weather, 1 Holiday, 4 Time (ToD + DoW)]
     X_merged = np.concatenate([traffic_reshaped, weather_feat, holiday_feat, time_feat], axis=-1)
     logger.info(f"Data Merged. Final Shape: {X_merged.shape}")
     

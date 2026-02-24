@@ -53,9 +53,11 @@ class DynamicGraph(nn.Module):
 
     def forward(self, x):
         # x : [B, T, N]
-        summary = x.mean(dim=1).unsqueeze(-1)   # [B, N, 1]
-        h1 = self.fc1(summary)                   # [B, N, hidden_dim]
-        h2 = self.fc2(summary)                   # [B, N, hidden_dim]
+        # Use DIFFERENT temporal summaries for fc1 vs fc2 to produce higher-rank adjacency
+        summary_mean = x.mean(dim=1).unsqueeze(-1)   # [B, N, 1] — average trend
+        summary_last = x[:, -1, :].unsqueeze(-1)     # [B, N, 1] — current state
+        h1 = self.fc1(summary_mean)                   # [B, N, hidden_dim]
+        h2 = self.fc2(summary_last)                   # [B, N, hidden_dim]
         A  = torch.matmul(h1, h2.transpose(-1, -2))
         A  = torch.softmax(torch.relu(A), dim=-1)
         return A   # [B, N, N]
@@ -88,13 +90,13 @@ class TrafficModel(nn.Module):
         )
         self.long = nn.TransformerEncoder(encoder, 2)
 
-        # FIX #17: context maps from 13 → 128 without squashing node dim
-        self.context = nn.Linear(13, 128)
+        # FIX #17: context maps from 9 → 128 without squashing node dim
+        self.context = nn.Linear(9, 128)
         self.gate    = nn.Linear(128, 128)
 
-        # Feature-level attention over all 14 features
+        # Feature-level attention over all 10 features
         self.feature_attn = nn.Sequential(
-            nn.Linear(14, 1),
+            nn.Linear(10, 1),
             nn.Sigmoid()
         )
 

@@ -27,7 +27,9 @@ class DynamicGraphGenerator(nn.Module):
         # x: [B, T, N, 1]  A_physical: [N, N]
         B, T, N, _ = x.shape
 
-        state     = x[:, -1, :, :]              # [B, N, 1]
+        # Use temporal mean across all timesteps instead of just the last one
+        # This captures traffic trends over the full input window
+        state     = x.mean(dim=1)                 # [B, N, 1]
         state_emb = torch.tanh(self.fc_start(state))  # [B, N, 16]
 
         # Compute raw dynamic scores
@@ -143,7 +145,7 @@ class AMC_DSTGNN(nn.Module):
       #13 — Teacher forcing decay slowed to 0.995^epoch.
       #14 — Alpha initialised at 0.0 (sigmoid → 0.5).
     """
-    def __init__(self, nfeat=14, N=207, hidden_dim=128, dropout=0.3, horizon=12):
+    def __init__(self, nfeat=10, N=207, hidden_dim=128, dropout=0.3, horizon=12):
         super(AMC_DSTGNN, self).__init__()
         self.dropout_p  = dropout
         self.N          = N
@@ -192,7 +194,7 @@ class AMC_DSTGNN(nn.Module):
         attn_scores  = torch.sigmoid(self.attn_fc(fusion_input))
         z = fusion_input * attn_scores
 
-        z_flat    = z.view(B * N, T, -1)
+        z_flat    = z.permute(0, 2, 1, 3).contiguous().reshape(B * N, T, -1)
         _, h_n    = self.encoder_gru(z_flat)
         hidden_state = h_n[0]   # [B*N, hidden_dim]
 
