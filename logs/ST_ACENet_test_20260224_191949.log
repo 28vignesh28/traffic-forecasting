@@ -1,0 +1,28 @@
+2026-02-24 19:19:51,100 - ST_ACENet_test - INFO - Testing ST_ACENet on cuda
+2026-02-24 19:19:54,426 - ST_ACENet_test - INFO - Starting Evaluation...
+2026-02-24 19:19:56,526 - ST_ACENet_test - INFO - Prediction shape: (6832, 12, 207), Ground truth shape: (6832, 12, 207)
+2026-02-24 19:19:56,526 - ST_ACENet_test - INFO - === Multi-Horizon Evaluation ===
+2026-02-24 19:19:56,546 - ST_ACENet_test - INFO - Performance (5-minute Horizon):
+2026-02-24 19:19:56,546 - ST_ACENet_test - INFO -   MAE:  2.5005
+2026-02-24 19:19:56,546 - ST_ACENet_test - INFO -   MSE:  18.8021
+2026-02-24 19:19:56,547 - ST_ACENet_test - INFO -   RMSE: 4.3361
+2026-02-24 19:19:56,547 - ST_ACENet_test - INFO -   MAPE: 5.78%
+
+2026-02-24 19:19:56,559 - ST_ACENet_test - INFO - Performance (15-minute Horizon):
+2026-02-24 19:19:56,559 - ST_ACENet_test - INFO -   MAE:  3.1988
+2026-02-24 19:19:56,559 - ST_ACENet_test - INFO -   MSE:  36.3561
+2026-02-24 19:19:56,559 - ST_ACENet_test - INFO -   RMSE: 6.0296
+2026-02-24 19:19:56,559 - ST_ACENet_test - INFO -   MAPE: 7.90%
+
+2026-02-24 19:19:56,576 - ST_ACENet_test - INFO - Performance (30-minute Horizon):
+2026-02-24 19:19:56,576 - ST_ACENet_test - INFO -   MAE:  3.9492
+2026-02-24 19:19:56,576 - ST_ACENet_test - INFO -   MSE:  56.6573
+2026-02-24 19:19:56,576 - ST_ACENet_test - INFO -   RMSE: 7.5271
+2026-02-24 19:19:56,576 - ST_ACENet_test - INFO -   MAPE: 10.19%
+
+2026-02-24 19:19:56,595 - ST_ACENet_test - INFO - Performance (60-minute Horizon):
+2026-02-24 19:19:56,595 - ST_ACENet_test - INFO -   MAE:  5.2230
+2026-02-24 19:19:56,595 - ST_ACENet_test - INFO -   MSE:  90.3472
+2026-02-24 19:19:56,595 - ST_ACENet_test - INFO -   RMSE: 9.5051
+2026-02-24 19:19:56,595 - ST_ACENet_test - INFO -   MAPE: 13.94%
+

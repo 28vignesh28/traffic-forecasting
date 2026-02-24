@@ -1,0 +1,54 @@
+2026-02-24 18:58:07,862 - AMC_DSTGNN - INFO - === Starting unified runner for AMC_DSTGNN ===
+2026-02-24 18:58:09,435 - AMC_DSTGNN - INFO - [AMC_DSTGNN] Initializing Unified Training Pipeline on cuda
+2026-02-24 18:58:09,435 - AMC_DSTGNN - INFO - [AMC_DSTGNN] Calling get_dataloaders...
+2026-02-24 18:58:13,633 - AMC_DSTGNN - INFO - [AMC_DSTGNN] Data Loaded: 207 Nodes, 14 Features (Traffic + Context)
+2026-02-24 18:58:13,633 - AMC_DSTGNN - INFO - [AMC_DSTGNN] Loading Physical adjacency matrix...
+2026-02-24 18:58:14,227 - AMC_DSTGNN - INFO - [AMC_DSTGNN] Building Architecture...
+2026-02-24 18:58:16,295 - AMC_DSTGNN - INFO - [AMC_DSTGNN] Starting Training for 60 epochs...
+2026-02-24 18:58:44,995 - AMC_DSTGNN - INFO - Epoch 001 | Train Loss: 0.0789 | Val Loss: 0.1083 | Time: 28.70s
+2026-02-24 18:58:45,017 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 18:59:21,126 - AMC_DSTGNN - INFO - Epoch 002 | Train Loss: 0.0592 | Val Loss: 0.1067 | Time: 36.11s
+2026-02-24 18:59:21,131 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 18:59:49,473 - AMC_DSTGNN - INFO - Epoch 003 | Train Loss: 0.0591 | Val Loss: 0.1058 | Time: 28.34s
+2026-02-24 18:59:49,479 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:00:11,565 - AMC_DSTGNN - INFO - Epoch 004 | Train Loss: 0.0599 | Val Loss: 0.1048 | Time: 22.09s
+2026-02-24 19:00:11,572 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:00:34,667 - AMC_DSTGNN - INFO - Epoch 005 | Train Loss: 0.0598 | Val Loss: 0.1035 | Time: 23.10s
+2026-02-24 19:00:34,673 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:00:58,073 - AMC_DSTGNN - INFO - Epoch 006 | Train Loss: 0.0607 | Val Loss: 0.1037 | Time: 23.40s
+2026-02-24 19:01:21,468 - AMC_DSTGNN - INFO - Epoch 007 | Train Loss: 0.0619 | Val Loss: 0.1050 | Time: 23.39s
+2026-02-24 19:01:46,751 - AMC_DSTGNN - INFO - Epoch 008 | Train Loss: 0.0624 | Val Loss: 0.1018 | Time: 25.28s
+2026-02-24 19:01:46,757 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:02:16,148 - AMC_DSTGNN - INFO - Epoch 009 | Train Loss: 0.0637 | Val Loss: 0.1011 | Time: 29.39s
+2026-02-24 19:02:16,206 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:02:43,965 - AMC_DSTGNN - INFO - Epoch 010 | Train Loss: 0.0635 | Val Loss: 0.0993 | Time: 27.76s
+2026-02-24 19:02:43,977 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:03:10,209 - AMC_DSTGNN - INFO - Epoch 011 | Train Loss: 0.0638 | Val Loss: 0.1003 | Time: 26.23s
+2026-02-24 19:03:33,348 - AMC_DSTGNN - INFO - Epoch 012 | Train Loss: 0.0630 | Val Loss: 0.0949 | Time: 23.14s
+2026-02-24 19:03:33,352 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:03:57,512 - AMC_DSTGNN - INFO - Epoch 013 | Train Loss: 0.0641 | Val Loss: 0.0993 | Time: 24.16s
+2026-02-24 19:04:21,145 - AMC_DSTGNN - INFO - Epoch 014 | Train Loss: 0.0625 | Val Loss: 0.0925 | Time: 23.63s
+2026-02-24 19:04:21,156 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:04:45,848 - AMC_DSTGNN - INFO - Epoch 015 | Train Loss: 0.0634 | Val Loss: 0.0924 | Time: 24.69s
+2026-02-24 19:05:11,906 - AMC_DSTGNN - INFO - Epoch 016 | Train Loss: 0.0647 | Val Loss: 0.0928 | Time: 26.06s
+2026-02-24 19:05:37,587 - AMC_DSTGNN - INFO - Epoch 017 | Train Loss: 0.0650 | Val Loss: 0.0926 | Time: 25.68s
+2026-02-24 19:06:05,239 - AMC_DSTGNN - INFO - Epoch 018 | Train Loss: 0.0659 | Val Loss: 0.0941 | Time: 27.65s
+2026-02-24 19:06:30,635 - AMC_DSTGNN - INFO - Epoch 019 | Train Loss: 0.0660 | Val Loss: 0.0920 | Time: 25.40s
+2026-02-24 19:06:30,647 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:06:53,221 - AMC_DSTGNN - INFO - Epoch 020 | Train Loss: 0.0652 | Val Loss: 0.0932 | Time: 22.57s
+2026-02-24 19:07:13,066 - AMC_DSTGNN - INFO - Epoch 021 | Train Loss: 0.0654 | Val Loss: 0.0924 | Time: 19.84s
+2026-02-24 19:07:32,288 - AMC_DSTGNN - INFO - Epoch 022 | Train Loss: 0.0662 | Val Loss: 0.0943 | Time: 19.22s
+2026-02-24 19:07:51,309 - AMC_DSTGNN - INFO - Epoch 023 | Train Loss: 0.0668 | Val Loss: 0.0961 | Time: 19.02s
+2026-02-24 19:08:10,865 - AMC_DSTGNN - INFO - Epoch 024 | Train Loss: 0.0661 | Val Loss: 0.0928 | Time: 19.56s
+2026-02-24 19:08:31,991 - AMC_DSTGNN - INFO - Epoch 025 | Train Loss: 0.0676 | Val Loss: 0.0921 | Time: 21.13s
+2026-02-24 19:08:54,919 - AMC_DSTGNN - INFO - Epoch 026 | Train Loss: 0.0676 | Val Loss: 0.0917 | Time: 22.93s
+2026-02-24 19:08:54,928 - AMC_DSTGNN - INFO -   -> Saved Best Model to saved_models\amc_dstgnn_best.pth
+2026-02-24 19:09:19,489 - AMC_DSTGNN - INFO - Epoch 027 | Train Loss: 0.0680 | Val Loss: 0.0929 | Time: 24.56s
+2026-02-24 19:09:44,737 - AMC_DSTGNN - INFO - Epoch 028 | Train Loss: 0.0681 | Val Loss: 0.0925 | Time: 25.25s
+2026-02-24 19:10:11,474 - AMC_DSTGNN - INFO - Epoch 029 | Train Loss: 0.0695 | Val Loss: 0.0933 | Time: 26.74s
+2026-02-24 19:10:39,713 - AMC_DSTGNN - INFO - Epoch 030 | Train Loss: 0.0692 | Val Loss: 0.0933 | Time: 28.24s
+2026-02-24 19:11:07,763 - AMC_DSTGNN - INFO - Epoch 031 | Train Loss: 0.0684 | Val Loss: 0.0928 | Time: 28.05s
+2026-02-24 19:11:34,656 - AMC_DSTGNN - INFO - Epoch 032 | Train Loss: 0.0691 | Val Loss: 0.0934 | Time: 26.89s
+2026-02-24 19:12:05,015 - AMC_DSTGNN - INFO - Epoch 033 | Train Loss: 0.0694 | Val Loss: 0.0928 | Time: 30.36s
+2026-02-24 19:12:37,844 - AMC_DSTGNN - INFO - Epoch 034 | Train Loss: 0.0693 | Val Loss: 0.0933 | Time: 32.83s
+2026-02-24 19:12:37,844 - AMC_DSTGNN - INFO - [AMC_DSTGNN] Early Stopping triggered at Epoch 34
