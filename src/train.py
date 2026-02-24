@@ -5,43 +5,47 @@ import torch.optim as optim
 import yaml
 import time
 import argparse
-
-
 import sys
 
-# Ensure root directory is in path so 'models' and 'src' modules resolve
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from torch.utils.tensorboard import SummaryWriter
 
-from src.data_loader import get_dataloaders, load_static_adj
-from src.utils import evaluate_metrics, create_directories, setup_logging
+from src.data_loader  import get_dataloaders, load_static_adj
+from src.utils        import evaluate_metrics, create_directories, setup_logging, set_seed
 
-from models.cadgt import CADGT
+from models.cadgt          import CADGT
 from models.camt_gatformer import TrafficModel as CAMT_GATformer
-from models.amc_dstgnn import AMC_DSTGNN
-from models.st_acenet import ST_ACENet
+from models.amc_dstgnn     import AMC_DSTGNN
+from models.st_acenet      import ST_ACENet
 
 
 def train_unified_model(model_name, config_path="src/config.yaml"):
     create_directories()
     logger = setup_logging(model_name)
     writer = SummaryWriter(log_dir=os.path.join("logs", "tensorboard", model_name))
-    
+
     logger.info(f"=== Starting unified runner for {model_name} ===")
+
+    # ==========================================================================
+    # FIX #9: Reproducibility — seed all RNG sources before any model or data
+    # operations so that every run produces identical results.
+    # ==========================================================================
+    set_seed(42)
+
     # 1. Load Config
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
-        
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == 'cuda':
-        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.benchmark = False   # required for determinism (FIX #9)
     logger.info(f"[{model_name}] Initializing Unified Training Pipeline on {device}")
-    
-    # 2. Data Loading (Exactly 10 Features)
+
+    # 2. Data Loading
     logger.info(f"[{model_name}] Calling get_dataloaders...")
     train_loader, val_loader, _, scaler, dataset_info = get_dataloaders(config)
-    nodes = dataset_info['num_nodes']
+    nodes    = dataset_info['num_nodes']
     features = dataset_info['num_features']
     logger.info(f"[{model_name}] Data Loaded: {nodes} Nodes, {features} Features (Traffic + Context)")
 
@@ -54,78 +58,98 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
 
     logger.info(f"[{model_name}] Building Architecture...")
     if model_name == "CADGT":
-        model = CADGT(num_nodes=nodes, seq_len=config['training']['window'], 
-                      future_len=config['training']['horizon'], ctx_dim=features - 1, d_model=config['model_defaults']['hidden_dim']).to(device)
-        loss_fn = nn.L1Loss() # CADGT originally used L1
-        
+        model = CADGT(
+            num_nodes=nodes,
+            seq_len=config['training']['window'],
+            future_len=config['training']['horizon'],
+            ctx_dim=features - 1,
+            d_model=config['model_defaults']['hidden_dim']
+        ).to(device)
+        loss_fn = nn.L1Loss()
+
     elif model_name == "CAMT":
-        model = CAMT_GATformer(nodes=nodes).to(device)
-        loss_fn = nn.HuberLoss() # CAMT originally used Huber
-        
+        model   = CAMT_GATformer(nodes=nodes).to(device)
+        loss_fn = nn.HuberLoss()
+
     elif model_name == "AMC_DSTGNN":
-        model = AMC_DSTGNN(nfeat=features, N=nodes, hidden_dim=128, horizon=config['training']['horizon']).to(device)
-        loss_fn = nn.HuberLoss() # AMC originally used Huber
-        
+        model = AMC_DSTGNN(
+            nfeat=features, N=nodes, hidden_dim=128,
+            horizon=config['training']['horizon']
+        ).to(device)
+        loss_fn = nn.HuberLoss()
+
     elif model_name == "ST_ACENet":
-        model = ST_ACENet(nfeat=features, N=nodes, hidden_dim=64, static_adj=adj_static).to(device)
-        loss_fn = nn.GaussianNLLLoss()  # Proper probabilistic loss using both mu and sigma
-        
+        model   = ST_ACENet(nfeat=features, N=nodes, hidden_dim=64, static_adj=adj_static).to(device)
+        loss_fn = nn.GaussianNLLLoss()
+
     else:
         raise ValueError(f"Unknown model {model_name}")
 
-    # 4. Optimizer & Scheduler setup
-    optimizer = optim.AdamW(model.parameters(), 
-                            lr=config['training']['learning_rate'], 
-                            weight_decay=config['training']['weight_decay'])
-                            
+    # 4. Optimizer & Scheduler
+    optimizer = optim.AdamW(
+        model.parameters(),
+        lr=config['training']['learning_rate'],
+        weight_decay=config['training']['weight_decay']
+    )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=3
     )
 
-    # AMP Optimization
-    use_amp = 'cuda' in str(device)
-    grad_scaler = torch.amp.GradScaler('cuda') if use_amp else None
+    use_amp      = 'cuda' in str(device)
+    grad_scaler  = torch.amp.GradScaler('cuda') if use_amp else None
 
     # 5. Training Loop
-    epochs = config['training']['epochs']
-    patience = config['training']['patience']
-    max_grad_norm = config['training']['max_grad_norm']
-    save_path = os.path.join("saved_models", f"{model_name.lower()}_best.pth")
+    epochs         = config['training']['epochs']
+    patience       = config['training']['patience']
+    max_grad_norm  = config['training']['max_grad_norm']
+    save_path      = os.path.join("saved_models", f"{model_name.lower()}_best.pth")
 
-    best_val_loss = float('inf')
+    best_val_loss      = float('inf')
     early_stop_counter = 0
 
     logger.info(f"[{model_name}] Starting Training for {epochs} epochs...")
-    
+
     for epoch in range(epochs):
         epoch_start_time = time.time()
-        
+
         # --- TRAIN ---
         model.train()
         total_train_loss = 0.0
-        
-        for batch_idx, (x, y) in enumerate(train_loader):
+
+        for x, y in train_loader:
             x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
 
             with torch.amp.autocast('cuda', enabled=use_amp):
-                # Model-specific forward passes
                 if model_name == "CADGT":
                     preds = model(x)
-                    loss = loss_fn(preds, y)
+                    loss  = loss_fn(preds, y)
+
                 elif model_name == "CAMT":
                     ps_short, pl_long = model(x, adj_tensor)
-                    # CAMT is designed for short (3) and long (12) targets natively
-                    loss = loss_fn(ps_short, y[:, :3, :]) + loss_fn(pl_long, y)
+                    # ===========================================================
+                    # FIX #11: Short-term loss multiplied by 0.25 (= 3/12) to
+                    # equalise per-step gradient contribution between the 3-step
+                    # short branch and 12-step long branch.  Previously the short
+                    # branch received 4× the per-step gradient of the long branch,
+                    # over-biasing the auxiliary objective.
+                    # ===========================================================
+                    loss = 0.25 * loss_fn(ps_short, y[:, :3, :]) + loss_fn(pl_long, y)
+
                 elif model_name == "AMC_DSTGNN":
-                    # Teacher forcing decay ratio
-                    tf_ratio = 0.5 * (0.96 ** epoch)
-                    preds = model(x, adj_tensor, y=y, teacher_forcing_ratio=tf_ratio)
-                    loss = loss_fn(preds, y)
+                    # ===========================================================
+                    # FIX #13: Teacher-forcing decay rate slowed from 0.96 to
+                    # 0.995 per epoch.  At 0.96, the ratio dropped to ~24% by
+                    # epoch 18 — too fast for stable curriculum learning.
+                    # At 0.995 the ratio stays above 40% for 50 epochs.
+                    # ===========================================================
+                    tf_ratio = 0.5 * (0.995 ** epoch)
+                    preds    = model(x, adj_tensor, y=y, teacher_forcing_ratio=tf_ratio)
+                    loss     = loss_fn(preds, y)
+
                 elif model_name == "ST_ACENet":
                     mu, sigma = model(x)
-                    # Gaussian NLL uses mu, target, and sigma^2 (variance)
-                    loss = loss_fn(mu, y, sigma**2)
+                    loss      = loss_fn(mu, y, sigma ** 2)
 
             if use_amp:
                 grad_scaler.scale(loss).backward()
@@ -137,64 +161,84 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_norm)
                 optimizer.step()
-                
+
             total_train_loss += loss.item()
-            
+
         avg_train_loss = total_train_loss / len(train_loader)
 
         # --- VALIDATE ---
         model.eval()
         total_val_loss = 0.0
-        
+
         with torch.no_grad():
             for x, y in val_loader:
                 x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
-                
+
                 with torch.amp.autocast('cuda', enabled=use_amp):
                     if model_name == "CADGT":
                         preds = model(x)
-                        loss = loss_fn(preds, y)
+                        loss  = loss_fn(preds, y)
                     elif model_name == "CAMT":
                         ps_short, pl_long = model(x, adj_tensor)
-                        loss = loss_fn(ps_short, y[:, :3, :]) + loss_fn(pl_long, y)
+                        loss = 0.25 * loss_fn(ps_short, y[:, :3, :]) + loss_fn(pl_long, y)
                     elif model_name == "AMC_DSTGNN":
                         preds = model(x, adj_tensor, teacher_forcing_ratio=0.0)
-                        loss = loss_fn(preds, y)
+                        loss  = loss_fn(preds, y)
                     elif model_name == "ST_ACENet":
                         mu, sigma = model(x)
-                        loss = loss_fn(mu, y, sigma**2)
+                        loss      = loss_fn(mu, y, sigma ** 2)
 
                 total_val_loss += loss.item()
-                
+
         avg_val_loss = total_val_loss / len(val_loader)
         scheduler.step(avg_val_loss)
-        
+
         epoch_dur = time.time() - epoch_start_time
-        logger.info(f"Epoch {epoch+1:03d} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Time: {epoch_dur:.2f}s")
-        
-        # Tensorboard Logging
-        writer.add_scalar('Loss/Train', avg_train_loss, epoch)
-        writer.add_scalar('Loss/Validation', avg_val_loss, epoch)
-        writer.add_scalar('LearningRate', optimizer.param_groups[0]['lr'], epoch)
-        
-        # Checkpointing & Early Stopping
+        logger.info(
+            f"Epoch {epoch+1:03d} | Train Loss: {avg_train_loss:.4f} | "
+            f"Val Loss: {avg_val_loss:.4f} | Time: {epoch_dur:.2f}s"
+        )
+
+        writer.add_scalar('Loss/Train',      avg_train_loss, epoch)
+        writer.add_scalar('Loss/Validation', avg_val_loss,   epoch)
+        writer.add_scalar('LearningRate',    optimizer.param_groups[0]['lr'], epoch)
+
+        # Checkpoint & Early Stopping
         if avg_val_loss < best_val_loss - 1e-4:
-            best_val_loss = avg_val_loss
+            best_val_loss      = avg_val_loss
             early_stop_counter = 0
-            torch.save(model.state_dict(), save_path)
-            logger.info(f"  -> Saved Best Model to {save_path}")
+
+            # =================================================================
+            # FIX #10: Scaler statistics saved alongside model weights so that
+            # test.py can load them from the checkpoint rather than recomputing
+            # from a fresh get_dataloaders() call (which risks API variability).
+            # =================================================================
+            torch.save(
+                {
+                    'model':        model.state_dict(),
+                    'scaler_mean':  scaler.mean,
+                    'scaler_std':   scaler.std,
+                    'epoch':        epoch + 1,
+                    'val_loss':     avg_val_loss,
+                },
+                save_path
+            )
+            logger.info(f"  -> Saved Best Model (+ scaler) to {save_path}")
         else:
             early_stop_counter += 1
-            
+
         if early_stop_counter >= patience:
             logger.info(f"[{model_name}] Early Stopping triggered at Epoch {epoch+1}")
             break
-            
+
     writer.close()
-            
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, required=True, choices=["CADGT", "CAMT", "AMC_DSTGNN", "ST_ACENet"])
+    parser.add_argument(
+        "--model", type=str, required=True,
+        choices=["CADGT", "CAMT", "AMC_DSTGNN", "ST_ACENet"]
+    )
     args = parser.parse_args()
-    
     train_unified_model(args.model)
