@@ -1,0 +1,29 @@
+I have built a traffic flow forecasting framework as part of my research project. It implements four Spatio-Temporal Graph Neural Network models — AMC-DSTGNN, CADGT, CAMT-GATformer, and ST-ACENet — trained and evaluated on the METR-LA dataset (207 sensors, Los Angeles).
+
+The framework makes three core technical claims:
+1. Dynamic Spatial Dependency Learning — Graph structure changes per iteration based on traffic state, blending static road geometry with learned dependencies.
+2. Multi-Context Integration — Models integrate external factors (temperature, rainfall, wind speed, visibility, holidays, time-of-day, day-of-week) alongside traffic speed.
+3. Unified Short-Term and Long-Term Temporal Modeling — A single model handles 5-minute to 60-minute forecasting in one forward pass (12-step horizon).
+
+Implementation details:
+- Unified train.py and test.py that train/test all four models with identical data pipeline
+- 10-feature input tensor (traffic + weather + holidays + temporal encodings)
+- AdamW optimizer, early stopping (patience=8), ReduceLROnPlateau scheduler
+- Mixed precision (AMP) training with gradient clipping
+
+Test results (MAE / RMSE / MAPE on unseen test set):
+
+| Horizon | CADGT              | AMC_DSTGNN         | CAMT               | ST_ACENet           |
+|---------|--------------------|--------------------|--------------------|---------------------|
+| 5-min   | 2.48 / 6.11 / 6.73% | 2.90 / 6.53 / 7.38% | 3.51 / 6.48 / 9.12% | 3.91 / 7.94 / 9.59% |
+| 15-min  | 1.85 / 4.04 / 3.90% | 2.64 / 6.09 / 5.39% | 2.87 / 5.51 / 6.49% | 3.28 / 6.63 / 6.66% |
+| 30-min  | 4.25 / 7.14 / 11.17% | 4.92 / 7.39 / 12.21% | 5.97 / 8.62 / 15.28% | 5.20 / 8.29 / 12.21% |
+| 60-min  | 1.52 / 2.59 / 2.54% | 1.96 / 2.95 / 3.22% | 2.01 / 3.05 / 3.35% | 2.48 / 3.80 / 4.03% |
+
+Please evaluate:
+1. How do these results compare to published SOTA benchmarks on METR-LA (e.g., DCRNN, Graph WaveNet, STGCN, AGCRN, ASTGNN, PDFormer)?
+2. Are the three technical claims scientifically valid and well-supported by the implementation?
+3. What are the strengths and weaknesses of this framework from a research perspective?
+4. Is this project of sufficient quality and novelty for a research publication or thesis?
+5. What specific improvements would make it stronger?
+6. Is there anything unusual or concerning about the metrics (e.g., the 60-minute horizon showing lower error than 30-minute)?

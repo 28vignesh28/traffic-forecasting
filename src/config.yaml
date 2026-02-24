@@ -1,0 +1,21 @@
+data:
+  traffic_path: "data/METR-LA.h5"
+  adj_path: "data/adj_METR-LA.pkl"
+  lat: 34.05
+  lon: -118.25
+  start_date: "2018-03-01"
+  days_to_fetch: 120 # Approximately 4 months of data to match METR-LA
+
+training:
+  batch_size: 64
+  epochs: 60
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  patience: 8
+  max_grad_norm: 5.0
+  window: 12  # Historical sequence length (5-min intervals -> 1 hour)
+  horizon: 12 # Future prediction sequence length (5-min intervals -> 1 hour)
+
+model_defaults:
+  hidden_dim: 64
+  dropout: 0.3

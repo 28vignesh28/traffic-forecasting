@@ -1,0 +1,28 @@
+2026-02-24 15:49:58,288 - CAMT_test - INFO - Testing CAMT on cuda
+2026-02-24 15:50:01,865 - CAMT_test - INFO - Starting Evaluation...
+2026-02-24 15:50:02,773 - CAMT_test - INFO - Prediction shape: (6832, 12, 207), Ground truth shape: (6832, 12, 207)
+2026-02-24 15:50:02,773 - CAMT_test - INFO - === Multi-Horizon Evaluation ===
+2026-02-24 15:50:02,788 - CAMT_test - INFO - Performance (5-minute Horizon):
+2026-02-24 15:50:02,788 - CAMT_test - INFO -   MAE:  4.0301
+2026-02-24 15:50:02,788 - CAMT_test - INFO -   MSE:  50.8964
+2026-02-24 15:50:02,788 - CAMT_test - INFO -   RMSE: 7.1342
+2026-02-24 15:50:02,793 - CAMT_test - INFO -   MAPE: 12.22%
+
+2026-02-24 15:50:02,803 - CAMT_test - INFO - Performance (15-minute Horizon):
+2026-02-24 15:50:02,803 - CAMT_test - INFO -   MAE:  4.1441
+2026-02-24 15:50:02,803 - CAMT_test - INFO -   MSE:  54.7277
+2026-02-24 15:50:02,803 - CAMT_test - INFO -   RMSE: 7.3978
+2026-02-24 15:50:02,803 - CAMT_test - INFO -   MAPE: 12.66%
+
+2026-02-24 15:50:02,812 - CAMT_test - INFO - Performance (30-minute Horizon):
+2026-02-24 15:50:02,812 - CAMT_test - INFO -   MAE:  4.2406
+2026-02-24 15:50:02,812 - CAMT_test - INFO -   MSE:  58.4106
+2026-02-24 15:50:02,812 - CAMT_test - INFO -   RMSE: 7.6427
+2026-02-24 15:50:02,812 - CAMT_test - INFO -   MAPE: 13.02%
+
+2026-02-24 15:50:02,822 - CAMT_test - INFO - Performance (60-minute Horizon):
+2026-02-24 15:50:02,822 - CAMT_test - INFO -   MAE:  4.4664
+2026-02-24 15:50:02,822 - CAMT_test - INFO -   MSE:  65.6534
+2026-02-24 15:50:02,822 - CAMT_test - INFO -   RMSE: 8.1027
+2026-02-24 15:50:02,822 - CAMT_test - INFO -   MAPE: 13.96%
+
