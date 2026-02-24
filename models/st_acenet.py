@@ -60,7 +60,10 @@ class ST_ACENet(nn.Module):
         super(ST_ACENet, self).__init__()
 
         if static_adj is not None:
-            self.register_buffer('static_adj', torch.FloatTensor(static_adj))
+            adj_t = torch.FloatTensor(static_adj)
+            # Row-normalize so static adj has same scale as softmax-normalized dynamic graph
+            adj_t = adj_t / (adj_t.sum(dim=-1, keepdim=True) + 1e-8)
+            self.register_buffer('static_adj', adj_t)
         else:
             self.static_adj = None
 

@@ -48,8 +48,10 @@ class DynamicGraphGenerator(nn.Module):
         sparse_A_dyn = mask.scatter_(2, topk_indices, topk_values)
         A_dyn = F.softmax(sparse_A_dyn, dim=2)   # Now properly sparse
 
-        # Expand physical graph to batch
-        A_phys_batch = A_physical.unsqueeze(0).expand(B, -1, -1)
+        # Expand and row-normalize physical graph so it has consistent scale
+        # with the softmax-normalized dynamic graph (both have row sums ≈ 1)
+        A_phys = A_physical.unsqueeze(0).expand(B, -1, -1)
+        A_phys_batch = A_phys / (A_phys.sum(dim=-1, keepdim=True) + 1e-8)
 
         # Blend
         alpha_clamped = torch.sigmoid(self.alpha)

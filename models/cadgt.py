@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 
 class ContextEncoder(nn.Module):
@@ -169,8 +170,13 @@ class CADGT(nn.Module):
         h          = h * alpha
 
         # Spatio-temporal blocks (each receives per-timestep graph)
-        h = self.st1(h, A)
-        h = self.st2(h, A)
+        # Gradient checkpointing: trade compute for VRAM savings (~2.5GB per block)
+        if self.training:
+            h = checkpoint(self.st1, h, A, use_reentrant=False)
+            h = checkpoint(self.st2, h, A, use_reentrant=False)
+        else:
+            h = self.st1(h, A)
+            h = self.st2(h, A)
 
         # Readout: flatten time×feature, predict per-node future speeds
         B, T, N, D = h.shape

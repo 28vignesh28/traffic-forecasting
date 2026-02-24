@@ -59,8 +59,9 @@ def fetch_weather_api(lat, lon, start_date, end_date):
         df = pd.DataFrame(data["hourly"])
         df["time"] = pd.to_datetime(df["time"])
         
-        # Resample from hourly to 5-minute intervals to match traffic data
-        df = df.set_index("time").resample("5min").ffill().reset_index()
+        # [FIX] Resample from hourly to 5-minute intervals using linear interpolation
+        # This provides sub-hourly weather variance across the 12 steps.
+        df = df.set_index("time").resample("5min").interpolate(method="linear").bfill().ffill().reset_index()
         return df
     except Exception as e:
         logger.warning(f"  [Warning] Weather API failed ({e}). Using zeros.")
@@ -116,7 +117,7 @@ def add_time_features(timestamps, N):
 
 
 
-def merge_features(traffic, timestamps, config):
+def merge_features(traffic, timestamps, config, train_end=None):
     """Merges all 14 features uniformly."""
     T, N = traffic.shape
     
@@ -131,9 +132,11 @@ def merge_features(traffic, timestamps, config):
     weather_aligned = weather_df.set_index("time").reindex(timestamps).ffill().bfill()
     weather_feat = weather_aligned[["temperature_2m", "precipitation", "visibility", "windspeed_10m"]].values
     
-    # 2. Fetch Holidays
-    year = timestamps[0].year
-    holiday_dates = fetch_holiday_api(year)
+    # 2. Fetch Holidays (all years in dataset)
+    years = set(timestamps.year)
+    holiday_dates = set()
+    for yr in years:
+        holiday_dates |= fetch_holiday_api(yr)
     
     holiday_feat = np.zeros((T, 1))
     current_dates = timestamps.date
@@ -153,10 +156,14 @@ def merge_features(traffic, timestamps, config):
     weather_feat = np.repeat(weather_feat[:, None, :], N, axis=1)
     holiday_feat = np.repeat(holiday_feat[:, None, :], N, axis=1)
 
-    # 5. Normalize Weather (Z-Score)
+    # 5. Normalize Weather (Z-Score) — use ONLY training data stats to prevent leakage
     logger.info("Normalizing Weather Features...")
-    mean_w = np.mean(weather_feat, axis=(0, 1), keepdims=True)
-    std_w = np.std(weather_feat, axis=(0, 1), keepdims=True)
+    if train_end is not None:
+        mean_w = np.mean(weather_feat[:train_end], axis=(0, 1), keepdims=True)
+        std_w = np.std(weather_feat[:train_end], axis=(0, 1), keepdims=True)
+    else:
+        mean_w = np.mean(weather_feat, axis=(0, 1), keepdims=True)
+        std_w = np.std(weather_feat, axis=(0, 1), keepdims=True)
     weather_feat = (weather_feat - mean_w) / (std_w + 1e-5)
 
     # 6. Concatenate 14 Complete Features
@@ -168,8 +175,9 @@ def merge_features(traffic, timestamps, config):
 
 
 class TrafficSequenceDataset(torch.utils.data.Dataset):
-    def __init__(self, X_merged, window=12, horizon=12):
-        self.X_merged = torch.FloatTensor(X_merged)
+    def __init__(self, X_merged, window=12, horizon=12, device="cpu"):
+        # Move entire dataset to GPU VRAM immediately to bypass PCIe bottleneck
+        self.X_merged = torch.FloatTensor(X_merged).to(device)
         self.window = window
         self.horizon = horizon
         self.length = len(X_merged) - window - horizon + 1
@@ -204,7 +212,7 @@ def get_dataloaders(config):
     traffic_normalized = scaler.transform(traffic)
     
     # Merge Features (Using Normalized Traffic)
-    X_merged = merge_features(traffic_normalized, timestamps, config['data'])
+    X_merged = merge_features(traffic_normalized, timestamps, config['data'], train_end=train_end)
     
     # Split into sets
     train_data = X_merged[:train_end]
@@ -215,9 +223,13 @@ def get_dataloaders(config):
     window = config['training']['window']
     horizon = config['training']['horizon']
     
-    train_ds = TrafficSequenceDataset(train_data, window, horizon)
-    val_ds = TrafficSequenceDataset(val_data, window, horizon)
-    test_ds = TrafficSequenceDataset(test_data, window, horizon)
+    # Detect GPU and load datasets directly into VRAM
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"Loading full datasets directly into {device} VRAM to bypass PCIe bottlenecks...")
+
+    train_ds = TrafficSequenceDataset(train_data, window, horizon, device=device)
+    val_ds = TrafficSequenceDataset(val_data, window, horizon, device=device)
+    test_ds = TrafficSequenceDataset(test_data, window, horizon, device=device)
     
     batch_size = config['training']['batch_size']
     

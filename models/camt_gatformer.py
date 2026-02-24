@@ -117,7 +117,9 @@ class TrafficModel(nn.Module):
 
         # ---- Graph Construction ----
         adj_adapt = self.adapt_graph()                   # [N, N]
-        adj_base  = adj_static + adj_adapt               # [N, N]
+        # Row-normalize static adj so it has same scale as softmax-normalized adaptive graph
+        adj_static_norm = adj_static / (adj_static.sum(dim=-1, keepdim=True) + 1e-8)
+        adj_base  = adj_static_norm + adj_adapt          # [N, N]
 
         adj_dyn   = self.dynamic_graph(x)                # [B, N, N]
         adj_total = adj_base.unsqueeze(0) + adj_dyn      # [B, N, N]
