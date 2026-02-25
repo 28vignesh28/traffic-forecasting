@@ -1,11 +1,12 @@
 import os
 import pickle
 import json
+import hashlib
 import numpy as np
 import pandas as pd
 import requests
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 import logging
 
 logger = logging.getLogger("DataLoader")
@@ -46,8 +47,17 @@ def load_traffic(file_path):
 
 
 def fetch_weather_api(lat, lon, start_date, end_date, cache_dir="data"):
-    """Fetches weather from Open-Meteo API with local CSV caching."""
-    cache_path = os.path.join(cache_dir, "weather_cache.csv")
+    """Fetches weather from Open-Meteo API with local CSV caching.
+    
+    FIX: Cache is keyed on (lat, lon, start_date, end_date) to prevent
+    stale data when switching datasets or date ranges.
+    
+    FIX: Weather timestamps are converted from UTC (API default) to
+    America/Los_Angeles to match METR-LA traffic timestamps.
+    """
+    # FIX #2: Hash-keyed cache filename so different coords/dates don't collide
+    cache_key = hashlib.md5(f"{lat}_{lon}_{start_date}_{end_date}".encode()).hexdigest()[:10]
+    cache_path = os.path.join(cache_dir, f"weather_cache_{cache_key}.csv")
 
     # --- Load from cache if available ---
     if os.path.exists(cache_path):
@@ -72,6 +82,11 @@ def fetch_weather_api(lat, lon, start_date, end_date, cache_dir="data"):
 
         df = pd.DataFrame(data["hourly"])
         df["time"] = pd.to_datetime(df["time"])
+
+        # FIX #1: Convert UTC → America/Los_Angeles to match METR-LA timestamps.
+        # Open-Meteo returns UTC; METR-LA traffic data is in local LA time (PST/PDT).
+        # Without this conversion, weather is misaligned by 7-8 hours.
+        df["time"] = df["time"].dt.tz_localize("UTC").dt.tz_convert("America/Los_Angeles").dt.tz_localize(None)
 
         # Resample from hourly to 5-minute intervals using linear interpolation
         df = df.set_index("time").resample("5min").interpolate(method="linear").bfill().ffill().reset_index()

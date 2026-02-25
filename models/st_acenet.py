@@ -57,7 +57,7 @@ class ST_ACENet(nn.Module):
       #18 — sigma is now returned to test.py where it is evaluated as
              a calibration/NLL metric alongside MAE/MSE/RMSE/MAPE.
     """
-    def __init__(self, nfeat=10, N=207, hidden_dim=64, static_adj=None):
+    def __init__(self, nfeat=10, N=207, hidden_dim=64, horizon=12, static_adj=None):
         super(ST_ACENet, self).__init__()
 
         if static_adj is not None:
@@ -84,7 +84,7 @@ class ST_ACENet(nn.Module):
         self.long_branch   = nn.GRU(hidden_dim, hidden_dim, batch_first=True)
         self.temporal_gate = nn.Linear(hidden_dim * 2, hidden_dim)
 
-        self.horizon  = 12
+        self.horizon  = horizon
         self.fc_mu    = nn.Linear(hidden_dim, self.horizon)
         self.fc_sigma = nn.Linear(hidden_dim, self.horizon)
 

@@ -50,16 +50,20 @@ def test_unified_model(model_name, config_path="src/config.yaml"):
             ctx_dim=features - 1, d_model=hidden_dim, static_adj=adj_static
         ).to(device)
     elif model_name == "CAMT":
+        camt_overrides = config.get('model_overrides', {}).get('CAMT', {})
+        short_horizon = camt_overrides.get('short_horizon', 3)
         model = CAMT_GATformer(
             nodes=nodes, nfeat=features,
-            seq_len=window, short_horizon=3, horizon=horizon
+            seq_len=window, short_horizon=short_horizon, horizon=horizon
         ).to(device)
     elif model_name == "AMC_DSTGNN":
         model = AMC_DSTGNN(
             nfeat=features, N=nodes, hidden_dim=128, horizon=horizon
         ).to(device)
     elif model_name == "ST_ACENet":
-        model = ST_ACENet(nfeat=features, N=nodes, static_adj=adj_static).to(device)
+        model = ST_ACENet(
+            nfeat=features, N=nodes, horizon=horizon, static_adj=adj_static
+        ).to(device)
     else:
         raise ValueError(f"Unknown model {model_name}")
 
@@ -80,9 +84,11 @@ def test_unified_model(model_name, config_path="src/config.yaml"):
         mean=checkpoint['scaler_mean'],
         std=checkpoint['scaler_std']
     )
+    # FIX #10: Safe formatting — avoid crash if val_loss key is missing from old checkpoints
+    val_loss_str = f"{checkpoint['val_loss']:.4f}" if 'val_loss' in checkpoint else '?'
     logger.info(
         f"Loaded model (epoch {checkpoint.get('epoch', '?')}, "
-        f"val_loss {checkpoint.get('val_loss', '?'):.4f}). "
+        f"val_loss {val_loss_str}). "
         f"Scaler: mean={scaler.mean:.4f}, std={scaler.std:.4f}"
     )
     model.eval()

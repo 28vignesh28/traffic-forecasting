@@ -69,7 +69,9 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
         loss_fn = nn.L1Loss()
 
     elif model_name == "CAMT":
-        short_horizon = 3  # CAMT short branch horizon
+        # FIX #9: Read model_overrides from config instead of hardcoding
+        camt_overrides = config.get('model_overrides', {}).get('CAMT', {})
+        short_horizon = camt_overrides.get('short_horizon', 3)
         model   = CAMT_GATformer(
             nodes=nodes, nfeat=features,
             seq_len=config['training']['window'],
@@ -86,7 +88,11 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
         loss_fn = nn.HuberLoss()
 
     elif model_name == "ST_ACENet":
-        model   = ST_ACENet(nfeat=features, N=nodes, hidden_dim=64, static_adj=adj_static).to(device)
+        model   = ST_ACENet(
+            nfeat=features, N=nodes, hidden_dim=64,
+            horizon=config['training']['horizon'],
+            static_adj=adj_static
+        ).to(device)
         loss_fn = nn.GaussianNLLLoss()
 
     else:
@@ -192,7 +198,10 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
                         loss  = loss_fn(preds, y)
                     elif model_name == "CAMT":
                         ps_short, pl_long = model(x, adj_tensor)
-                        loss = 0.25 * loss_fn(ps_short, y[:, :short_horizon, :]) + loss_fn(pl_long, y)
+                        # FIX #8: Use ONLY long-term loss for validation/checkpoint
+                        # selection. Including the auxiliary short-term loss biases
+                        # the checkpoint toward overfitting the short-term task.
+                        loss = loss_fn(pl_long, y)
                     elif model_name == "AMC_DSTGNN":
                         preds = model(x, adj_tensor, teacher_forcing_ratio=0.0)
                         loss  = loss_fn(preds, y)

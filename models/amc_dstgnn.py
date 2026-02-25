@@ -44,7 +44,7 @@ class DynamicGraphGenerator(nn.Module):
         # Fix: fill non-selected positions with -inf so exp(-inf) = 0,
         # making softmax truly zero those connections out.
         # =================================================================
-        k = self.k
+        k = min(self.k, N)  # FIX: Guard against N < k for small graphs
         topk_values, topk_indices = torch.topk(A_dyn, k, dim=2)
         mask = torch.full_like(A_dyn, float('-inf'))
         sparse_A_dyn = mask.scatter_(2, topk_indices, topk_values)
@@ -86,14 +86,19 @@ class ChebConvLayer(nn.Module):
     def forward(self, x, A):
         B, T, N, Fin = x.shape
 
+        # FIX #4: Symmetrize A before computing Laplacian.
+        # The blended adjacency (row-norm physical + softmax dynamic) is asymmetric.
+        # Symmetric normalized Laplacian requires symmetric A for real eigenvalues.
+        A_sym = (A + A.transpose(-1, -2)) / 2.0
+
         # --- Symmetric Normalised Laplacian (eigenvalues always in [0, 2]) ---
-        # L_sym = I - D^{-½} A D^{-½}
+        # L_sym = I - D^{-½} A_sym D^{-½}
         # Scaled: L̃ = L_sym - I  → eigenvalues in [-1, 1] ✓
-        degree = A.sum(dim=-1).clamp(min=1e-8)        # [B, N]
+        degree = A_sym.sum(dim=-1).clamp(min=1e-8)        # [B, N]
         D_inv_sqrt = torch.diag_embed(1.0 / torch.sqrt(degree))  # [B, N, N]
         # FIX #20: Use cached identity buffer
         I = self.I.unsqueeze(0).expand(B, -1, -1)        # [B, N, N]
-        L_sym    = I - D_inv_sqrt @ A @ D_inv_sqrt    # [B, N, N]
+        L_sym    = I - D_inv_sqrt @ A_sym @ D_inv_sqrt    # [B, N, N]
         L_scaled = L_sym - I                           # eigenvalues in [-1, 1]
 
         outputs    = torch.zeros(B, T, N, self.out_f, device=x.device)
@@ -208,15 +213,16 @@ class AMC_DSTGNN(nn.Module):
             prediction   = self.fc_out(hidden_state)   # [B*N, 1]
             outputs.append(prediction)
 
-            # FIX #22: Teacher forcing via torch.bernoulli for reproducibility
+            # FIX #5: Per-sequence teacher forcing via torch.bernoulli.
+            # Previously a single Bernoulli sample was used for the entire batch,
+            # meaning all B*N sequences got the same decision. Now each sequence
+            # independently decides whether to use ground truth or prediction.
             if self.training and y is not None and teacher_forcing_ratio > 0:
                 use_teacher = torch.bernoulli(
-                    torch.full((1,), teacher_forcing_ratio, device=prediction.device)
-                ).bool().item()
-                if use_teacher:
-                    current_input = y[:, step, :].reshape(B * N, 1)
-                else:
-                    current_input = prediction
+                    torch.full((B * N, 1), teacher_forcing_ratio, device=prediction.device)
+                )  # [B*N, 1], each element 0 or 1
+                gt_input = y[:, step, :].reshape(B * N, 1)
+                current_input = use_teacher * gt_input + (1 - use_teacher) * prediction
             else:
                 current_input = prediction
 
