@@ -9,8 +9,10 @@ import numpy as np
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from src.data_loader import get_dataloaders, load_static_adj
+from src.data_loader import get_dataloaders, load_traffic, load_static_adj
 from src.utils import set_seed
+import pandas as pd
+import matplotlib.dates as mdates
 from models.amc_dstgnn import AMC_DSTGNN
 from models.cadgt import CADGT
 from models.camt_gatformer import TrafficModel as CAMT
@@ -63,7 +65,8 @@ def load_model(model_name, config, nodes, features, window, horizon, short_horiz
 def main():
     parser = argparse.ArgumentParser(description="Visualize Traffic Forecast Models")
     parser.add_argument('--node', type=int, default=10, help="Node ID to plot (0 to 206)")
-    parser.add_argument('--batch_idx', type=int, default=1, help="Which test batch to use")
+    parser.add_argument('--start_batch', type=int, default=0, help="Starting test batch")
+    parser.add_argument('--num_batches', type=int, default=4, help="Number of continuous batches to plot")
     parser.add_argument('--horizon_idx', type=int, default=11, help="Horizon index (0 to 11, where 11 is 60 mins)")
     args = parser.parse_args()
 
@@ -77,6 +80,17 @@ def main():
     # Data loading
     _, test_loader, _, scaler, ds_info = get_dataloaders(config)
     
+    # We need timestamps directly to map to the test set
+    _, timestamps = load_traffic(config['data']['traffic_path'])
+    
+    # Replicate train/test split from data_loader.py to find the start of the test set
+    total_len = len(timestamps)
+    train_end = int(0.7 * total_len)
+    val_end   = int(0.8 * total_len)
+    
+    # The timestamps for the test set
+    test_timestamps = timestamps[val_end:]
+
     nodes    = ds_info['num_nodes']
     features = ds_info['num_features']
     window   = config['training']['window']
@@ -93,60 +107,92 @@ def main():
         model, ckpt = load_model(name, config, nodes, features, window, horizon, short_horizon, adj_static, device)
         loaded_models[name] = model
 
-    # Select a batch
+    # Select continuous batches to form a longer time-series
     test_iter = iter(test_loader)
-    for _ in range(args.batch_idx + 1):
-        x, y = next(test_iter)
     
-    x, y = x.to(device), y.to(device)
-
-    # Dictionary to store predictions
-    all_preds = {}
+    # Skip batches
+    for _ in range(args.start_batch):
+        next(test_iter)
+        
+    all_y = []
+    all_preds_list = {name: [] for name in models_to_test}
 
     with torch.no_grad():
-        for name, model in loaded_models.items():
-            if name == "CADGT":
-                preds = model(x)
-            elif name == "CAMT":
-                _, preds = model(x, adj_tensor)
-            elif name == "AMC_DSTGNN":
-                preds = model(x, adj_tensor, teacher_forcing_ratio=0.0)
-            elif name == "ST_ACENet":
-                preds, _ = model(x)
+        for _ in range(args.num_batches):
+            try:
+                x_b, y_b = next(test_iter)
+            except StopIteration:
+                break
             
-            # Re-scale back to actual speeds
-            preds = scaler.inverse_transform(preds)
-            all_preds[name] = preds.cpu().numpy()
+            x_b, y_b = x_b.to(device), y_b.to(device)
+            all_y.append(y_b)
             
-    # Ground truth
+            for name, model in loaded_models.items():
+                if name == "CADGT":
+                    preds = model(x_b)
+                elif name == "CAMT":
+                    _, preds = model(x_b, adj_tensor)
+                elif name == "AMC_DSTGNN":
+                    preds = model(x_b, adj_tensor, teacher_forcing_ratio=0.0)
+                elif name == "ST_ACENet":
+                    preds, _ = model(x_b)
+                
+                # Re-scale back to actual speeds
+                preds = scaler.inverse_transform(preds)
+                all_preds_list[name].append(preds.cpu().numpy())
+            
+    # Concatenate inputs and predictions along the batch dimension
+    if len(all_y) == 0:
+        raise ValueError("No test data found for the selected batches.")
+        
+    y = torch.cat(all_y, dim=0).to(device)
     truth = scaler.inverse_transform(y).cpu().numpy()
-
-    # We want to plot a continuous sequence for a specific node at a specific horizon.
-    # Shape of preds is (Batch, Horizon, Nodes)
-    # We will plot across the batch dimension (time)
     
+    all_preds = {}
+    for name in models_to_test:
+        all_preds[name] = np.concatenate(all_preds_list[name], axis=0)
+
     node = args.node
     h_idx = args.horizon_idx
-    times = np.arange(x.shape[0]) * 5  # Each batch step is 5 minutes progression
-
-    plt.figure(figsize=(15, 7))
-    plt.plot(times, truth[:, h_idx, node], 'k--', linewidth=3, label='Ground Truth')
     
+    # Calculate the exact timestamps for the plotted predictions
+    # 1 batch = config['training']['batch_size'] * 5 mins
+    # The first prediction corresponds to timestamp: start_batch * batch_size + window + horizon_idx
+    batch_size = config['training']['batch_size']
+    offset = (args.start_batch * batch_size) + window + h_idx
+    times = test_timestamps[offset : offset + truth.shape[0]]
+
+    plt.figure(figsize=(10, 4))
+    
+    # Truth plotting (matching reference image: light blue, thin, background)
+    plt.plot(times, truth[:, h_idx, node], color='#8cbce6', linewidth=1.0, alpha=0.9, label='Truth')
+    
+    # Model plotting colors (pastel/soft colors matching reference)
     colors = {
-        'CADGT':      '#ff7f0e', # orange
-        'CAMT':       '#2ca02c', # green
-        'AMC_DSTGNN': '#1f77b4', # blue
-        'ST_ACENet':  '#d62728', # red
+        'CADGT':      '#fcba79', # light orange
+        'CAMT':       '#81db8f', # light green
+        'AMC_DSTGNN': '#c49cce', # light purple
+        'ST_ACENet':  '#e88b8b', # light red
     }
 
     for name, cmds in all_preds.items():
-        plt.plot(times, cmds[:, h_idx, node], label=f'{name}', color=colors[name], linewidth=2, alpha=0.8)
+        plt.plot(times, cmds[:, h_idx, node], label=f'{name}', color=colors[name], linewidth=1.0, alpha=0.85)
 
-    plt.title(f"Model Predictions vs Ground Truth (Node {node}, { (h_idx+1)*5 }-min Horizon)")
-    plt.xlabel("Time progression (minutes)")
-    plt.ylabel("Traffic Speed (mph)")
-    plt.legend(loc='lower right', bbox_to_anchor=(1.15, 0), fontsize=10)
-    plt.grid(True, alpha=0.3)
+    plt.title(f"Node {node}", fontsize=12)
+    plt.xlabel("Time", fontsize=11)
+    plt.ylabel("Speed (mph)", fontsize=11)
+    
+    # Format x-axis with dates only (as requested)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    # Set ticks to daily intervals
+    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=1))
+    # Remove rotation for cleaner look if dates fit well
+    plt.xticks(rotation=0)
+    
+    # Legend inside the box, lower left as in reference
+    plt.legend(loc='lower left', fontsize=9, framealpha=1.0, edgecolor='lightgray')
+    
+    # Clean bounding box, no grid for a more academic look
     plt.tight_layout()
     
     os.makedirs('visualizations', exist_ok=True)
