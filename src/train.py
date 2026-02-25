@@ -56,14 +56,24 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
         adj_static = load_static_adj(config['data']['adj_path'])
         adj_tensor = torch.FloatTensor(adj_static).to(device)
 
+        # Validate adjacency matrix row-sums
+        row_sums = adj_tensor.sum(dim=-1)
+        max_dev = (row_sums - row_sums.mean()).abs().max().item()
+        if max_dev > 0.5:
+            logger.warning(
+                f"Adjacency row-sums vary significantly (max deviation: {max_dev:.2f}). "
+                f"This may indicate unnormalized or corrupted adjacency data."
+            )
+
     logger.info(f"[{model_name}] Building Architecture...")
     if model_name == "CADGT":
+        cadgt_overrides = config.get('model_overrides', {}).get('CADGT', {})
         model = CADGT(
             num_nodes=nodes,
             seq_len=config['training']['window'],
             future_len=config['training']['horizon'],
             ctx_dim=features - 1,
-            d_model=config['model_defaults']['hidden_dim'],
+            d_model=cadgt_overrides.get('hidden_dim', config['model_defaults']['hidden_dim']),
             static_adj=adj_static
         ).to(device)
         loss_fn = nn.L1Loss()
@@ -81,15 +91,20 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
         loss_fn = nn.HuberLoss()
 
     elif model_name == "AMC_DSTGNN":
+        amc_overrides = config.get('model_overrides', {}).get('AMC_DSTGNN', {})
         model = AMC_DSTGNN(
-            nfeat=features, N=nodes, hidden_dim=128,
+            nfeat=features, N=nodes,
+            hidden_dim=amc_overrides.get('hidden_dim', 128),
+            dropout=amc_overrides.get('dropout', 0.3),
             horizon=config['training']['horizon']
         ).to(device)
         loss_fn = nn.HuberLoss()
 
     elif model_name == "ST_ACENet":
+        ace_overrides = config.get('model_overrides', {}).get('ST_ACENet', {})
         model   = ST_ACENet(
-            nfeat=features, N=nodes, hidden_dim=64,
+            nfeat=features, N=nodes,
+            hidden_dim=ace_overrides.get('hidden_dim', 64),
             horizon=config['training']['horizon'],
             static_adj=adj_static
         ).to(device)
@@ -111,7 +126,7 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
     # FIX #31: Use device.type for correct autocast on both CPU and CUDA
     device_type  = device.type
     use_amp      = device_type == 'cuda'
-    grad_scaler  = torch.amp.GradScaler('cuda') if use_amp else None
+    grad_scaler  = torch.amp.GradScaler(device='cuda') if use_amp else None
 
     # 5. Training Loop
     epochs         = config['training']['epochs']
@@ -119,7 +134,7 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
     max_grad_norm  = config['training']['max_grad_norm']
     save_path      = os.path.join("saved_models", f"{model_name.lower()}_best.pth")
 
-    best_val_loss      = float('inf')
+    best_val_mae       = float('inf')
     early_stop_counter = 0
 
     logger.info(f"[{model_name}] Starting Training for {epochs} epochs...")
@@ -187,6 +202,7 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
         # --- VALIDATE ---
         model.eval()
         total_val_loss = 0.0
+        total_val_mae  = 0.0   # FIX #2: Uniform MAE for fair early stopping
 
         with torch.no_grad():
             for x, y in val_loader:
@@ -196,28 +212,34 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
                     if model_name == "CADGT":
                         preds = model(x)
                         loss  = loss_fn(preds, y)
+                        preds_for_mae = preds
                     elif model_name == "CAMT":
                         ps_short, pl_long = model(x, adj_tensor)
-                        # Use same combined loss as training for consistent comparison
                         loss = 0.25 * loss_fn(ps_short, y[:, :short_horizon, :]) + loss_fn(pl_long, y)
+                        preds_for_mae = pl_long
                     elif model_name == "AMC_DSTGNN":
                         preds = model(x, adj_tensor, teacher_forcing_ratio=0.0)
                         loss  = loss_fn(preds, y)
+                        preds_for_mae = preds
                     elif model_name == "ST_ACENet":
                         mu, sigma = model(x)
                         nll_loss  = loss_fn(mu, y, sigma ** 2)
                         mae_loss  = nn.functional.l1_loss(mu, y)
                         loss      = nll_loss + 0.5 * mae_loss
+                        preds_for_mae = mu
 
                 total_val_loss += loss.item()
+                # FIX #2: Track uniform MAE so early stopping is comparable across models
+                total_val_mae  += nn.functional.l1_loss(preds_for_mae, y).item()
 
         avg_val_loss = total_val_loss / len(val_loader)
+        avg_val_mae  = total_val_mae  / len(val_loader)
         scheduler.step(avg_val_loss)
 
         epoch_dur = time.time() - epoch_start_time
         logger.info(
             f"Epoch {epoch+1:03d} | Train Loss: {avg_train_loss:.4f} | "
-            f"Val Loss: {avg_val_loss:.4f} | Time: {epoch_dur:.2f}s"
+            f"Val Loss: {avg_val_loss:.4f} | Val MAE: {avg_val_mae:.4f} | Time: {epoch_dur:.2f}s"
         )
 
         writer.add_scalar('Loss/Train',      avg_train_loss, epoch)
@@ -225,8 +247,9 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
         writer.add_scalar('LearningRate',    optimizer.param_groups[0]['lr'], epoch)
 
         # Checkpoint & Early Stopping
-        if avg_val_loss < best_val_loss - 1e-4:
-            best_val_loss      = avg_val_loss
+        # FIX #2: Early stopping on uniform MAE — same metric for all models
+        if avg_val_mae < best_val_mae - 1e-4:
+            best_val_mae       = avg_val_mae
             early_stop_counter = 0
 
             # =================================================================
@@ -240,7 +263,7 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
                     'scaler_mean':  scaler.mean,
                     'scaler_std':   scaler.std,
                     'epoch':        epoch + 1,
-                    'val_loss':     avg_val_loss,
+                    'val_loss':     avg_val_mae,
                 },
                 save_path
             )

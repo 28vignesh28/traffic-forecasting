@@ -24,13 +24,18 @@ class GraphLayer(nn.Module):
         super().__init__()
         # FIX #5: project the *feature* dimension, not the node dimension
         self.linear = nn.Linear(in_features, out_features)
+        # Residual projection to preserve individual node identity
+        self.skip   = nn.Linear(in_features, out_features)
 
     def forward(self, x, adj):
         # x   : [B, T, N, in_features]
         # adj : [B, N, N]
         # Aggregate neighbours per node (batched, per-timestep)
         x_agg = torch.einsum('bnm,btmf->btnf', adj, x)  # [B, T, N, in_features]
-        return self.linear(x_agg)                          # [B, T, N, out_features]
+        out   = self.linear(x_agg)                         # [B, T, N, out_features]
+        # Residual: project input to match out_features and add identity
+        # This prevents over-smoothing by preserving individual node signal
+        return out + self.skip(x)                           # [B, T, N, out_features]
 
 
 class AdaptiveGraph(nn.Module):
@@ -91,6 +96,17 @@ class TrafficModel(nn.Module):
         self.adapt_graph   = AdaptiveGraph(nodes)
         self.dynamic_graph = DynamicGraph(nodes)
 
+        # =================================================================
+        # FIX: Learnable blend weights for the three adjacency components.
+        # Previously the three matrices were simply added (raw sum),
+        # producing uniform row-sums of 3.0 and near-uniform softmax
+        # attention — causing severe over-smoothing that collapsed
+        # prediction variance to 7× below ground truth (MAE 8.44).
+        # Now: α₁·static + α₂·adaptive + α₃·dynamic with sigmoid gates.
+        # =================================================================
+        self.alpha_static  = nn.Parameter(torch.tensor(0.0))  # sigmoid(0)=0.5
+        self.alpha_adapt   = nn.Parameter(torch.tensor(0.0))  # sigmoid(0)=0.5
+
         # FIX #5: in_features=1 (traffic feature dim), out_features=128
         self.graph = GraphLayer(in_features=1, out_features=128)
 
@@ -131,22 +147,27 @@ class TrafficModel(nn.Module):
         alpha = self.feature_attn(x_full).squeeze(-1)   # [B, T, N]
         x     = x_raw * alpha                            # [B, T, N]
 
-        # ---- Graph Construction ----
+        # ---- Graph Construction (FIX: learnable blend) ----
         adj_adapt = self.adapt_graph()                   # [N, N]
-        # Row-normalize static adj so it has same scale as softmax-normalized adaptive graph
+        # Row-normalize static adj to match softmax-normalized graphs
         adj_static_norm = adj_static / (adj_static.sum(dim=-1, keepdim=True) + 1e-8)
-        adj_base  = adj_static_norm + adj_adapt          # [N, N]
 
-        adj_dyn   = self.dynamic_graph(x)                # [B, N, N]
-        adj_total = adj_base.unsqueeze(0) + adj_dyn      # [B, N, N]
+        adj_dyn = self.dynamic_graph(x)                  # [B, N, N]
 
-        # =================================================================
-        # FIX #15: Re-normalise the summed adjacency so row-sums = 1.
-        # Previously three softmax-normalised matrices were added without
-        # renormalisation, letting row-sums exceed 2 and causing
-        # over-smoothing in the graph aggregation.
-        # =================================================================
-        adj_total = F.softmax(adj_total, dim=-1)         # [B, N, N]
+        # Learnable weighted blend instead of raw sum
+        w_static = torch.sigmoid(self.alpha_static)
+        w_adapt  = torch.sigmoid(self.alpha_adapt)
+        # Dynamic weight = remainder to ensure weights sum to 1
+        w_dyn    = 1.0 - w_static - w_adapt
+        # Clamp dynamic weight to be non-negative
+        w_dyn    = w_dyn.clamp(min=0.05)
+
+        adj_total = (w_static * adj_static_norm.unsqueeze(0)
+                     + w_adapt * adj_adapt.unsqueeze(0)
+                     + w_dyn * adj_dyn)                   # [B, N, N]
+
+        # Row-normalize to prevent magnitude drift
+        adj_total = adj_total / (adj_total.sum(dim=-1, keepdim=True) + 1e-8)
 
         # ---- Graph Convolution (FIX #5) ----
         # Expand traffic to [B, T, N, 1] so GraphLayer works on feature dim

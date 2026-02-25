@@ -1,0 +1,43 @@
+2026-02-25 12:42:21,786 - CAMT - INFO - === Starting unified runner for CAMT ===
+2026-02-25 12:42:23,443 - CAMT - INFO - [CAMT] Initializing Unified Training Pipeline on cuda
+2026-02-25 12:42:23,444 - CAMT - INFO - [CAMT] Calling get_dataloaders...
+2026-02-25 12:42:24,212 - CAMT - INFO - [CAMT] Data Loaded: 207 Nodes, 10 Features (Traffic + Context)
+2026-02-25 12:42:24,212 - CAMT - INFO - [CAMT] Loading Physical adjacency matrix...
+2026-02-25 12:42:24,756 - CAMT - WARNING - Adjacency row-sums vary significantly (max deviation: 4.01). This may indicate unnormalized or corrupted adjacency data.
+2026-02-25 12:42:24,762 - CAMT - INFO - [CAMT] Building Architecture...
+2026-02-25 12:42:25,641 - CAMT - INFO - [CAMT] Starting Training for 60 epochs...
+2026-02-25 12:43:56,905 - CAMT - INFO - Epoch 001 | Train Loss: 0.1847 | Val Loss: 0.1392 | Val MAE: 0.3013 | Time: 91.26s
+2026-02-25 12:43:56,944 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 12:45:30,274 - CAMT - INFO - Epoch 002 | Train Loss: 0.1363 | Val Loss: 0.1153 | Val MAE: 0.2694 | Time: 93.33s
+2026-02-25 12:45:30,285 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 12:47:04,438 - CAMT - INFO - Epoch 003 | Train Loss: 0.1209 | Val Loss: 0.1081 | Val MAE: 0.2548 | Time: 94.15s
+2026-02-25 12:47:04,449 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 12:48:39,082 - CAMT - INFO - Epoch 004 | Train Loss: 0.1157 | Val Loss: 0.1049 | Val MAE: 0.2514 | Time: 94.63s
+2026-02-25 12:48:39,091 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 12:50:13,299 - CAMT - INFO - Epoch 005 | Train Loss: 0.1129 | Val Loss: 0.1039 | Val MAE: 0.2445 | Time: 94.21s
+2026-02-25 12:50:13,309 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 12:51:46,910 - CAMT - INFO - Epoch 006 | Train Loss: 0.1113 | Val Loss: 0.1029 | Val MAE: 0.2453 | Time: 93.60s
+2026-02-25 12:53:20,249 - CAMT - INFO - Epoch 007 | Train Loss: 0.1099 | Val Loss: 0.1022 | Val MAE: 0.2565 | Time: 93.34s
+2026-02-25 12:54:53,490 - CAMT - INFO - Epoch 008 | Train Loss: 0.1087 | Val Loss: 0.1008 | Val MAE: 0.2437 | Time: 93.24s
+2026-02-25 12:54:53,499 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 12:56:26,532 - CAMT - INFO - Epoch 009 | Train Loss: 0.1079 | Val Loss: 0.1003 | Val MAE: 0.2431 | Time: 93.03s
+2026-02-25 12:56:26,541 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 12:57:59,307 - CAMT - INFO - Epoch 010 | Train Loss: 0.1074 | Val Loss: 0.0994 | Val MAE: 0.2461 | Time: 92.77s
+2026-02-25 12:59:31,970 - CAMT - INFO - Epoch 011 | Train Loss: 0.1067 | Val Loss: 0.0986 | Val MAE: 0.2407 | Time: 92.66s
+2026-02-25 12:59:31,979 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 13:01:04,867 - CAMT - INFO - Epoch 012 | Train Loss: 0.1062 | Val Loss: 0.0986 | Val MAE: 0.2504 | Time: 92.89s
+2026-02-25 13:02:37,600 - CAMT - INFO - Epoch 013 | Train Loss: 0.1058 | Val Loss: 0.0990 | Val MAE: 0.2405 | Time: 92.73s
+2026-02-25 13:02:37,610 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 13:04:10,599 - CAMT - INFO - Epoch 014 | Train Loss: 0.1053 | Val Loss: 0.0983 | Val MAE: 0.2464 | Time: 92.99s
+2026-02-25 13:05:43,979 - CAMT - INFO - Epoch 015 | Train Loss: 0.1048 | Val Loss: 0.0980 | Val MAE: 0.2448 | Time: 93.38s
+2026-02-25 13:07:17,246 - CAMT - INFO - Epoch 016 | Train Loss: 0.1045 | Val Loss: 0.0971 | Val MAE: 0.2379 | Time: 93.27s
+2026-02-25 13:07:17,254 - CAMT - INFO -   -> Saved Best Model (+ scaler) to saved_models\camt_best.pth
+2026-02-25 13:08:50,897 - CAMT - INFO - Epoch 017 | Train Loss: 0.1040 | Val Loss: 0.0990 | Val MAE: 0.2524 | Time: 93.64s
+2026-02-25 13:10:24,107 - CAMT - INFO - Epoch 018 | Train Loss: 0.1037 | Val Loss: 0.0972 | Val MAE: 0.2449 | Time: 93.21s
+2026-02-25 13:11:57,079 - CAMT - INFO - Epoch 019 | Train Loss: 0.1032 | Val Loss: 0.0971 | Val MAE: 0.2385 | Time: 92.97s
+2026-02-25 13:13:30,018 - CAMT - INFO - Epoch 020 | Train Loss: 0.1029 | Val Loss: 0.0975 | Val MAE: 0.2392 | Time: 92.94s
+2026-02-25 13:15:02,586 - CAMT - INFO - Epoch 021 | Train Loss: 0.1024 | Val Loss: 0.0967 | Val MAE: 0.2434 | Time: 92.57s
+2026-02-25 13:16:35,717 - CAMT - INFO - Epoch 022 | Train Loss: 0.1020 | Val Loss: 0.0971 | Val MAE: 0.2500 | Time: 93.13s
+2026-02-25 13:18:09,974 - CAMT - INFO - Epoch 023 | Train Loss: 0.1019 | Val Loss: 0.0961 | Val MAE: 0.2391 | Time: 94.26s
+2026-02-25 13:19:44,746 - CAMT - INFO - Epoch 024 | Train Loss: 0.1014 | Val Loss: 0.0962 | Val MAE: 0.2424 | Time: 94.77s
+2026-02-25 13:19:44,747 - CAMT - INFO - [CAMT] Early Stopping triggered at Epoch 24

@@ -41,7 +41,7 @@ Ensure your hyper-parameters in `src/config.yaml` are set. The dataloader uses `
 ```bash
 python src/train.py --model CADGT
 ```
-*(Options:  )*
+*(Options: CADGT, CAMT, AMC_DSTGNN, ST_ACENet)*
 
 ### 2. Evaluating 60-Minute Targets
 To calculate validation metrics explicitly masked for non-zero null sensors on your best saved checkpoint weights:

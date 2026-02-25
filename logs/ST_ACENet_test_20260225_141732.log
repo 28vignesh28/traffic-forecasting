@@ -1,0 +1,46 @@
+2026-02-25 14:17:34,357 - ST_ACENet_test - INFO - Testing ST_ACENet on cuda
+2026-02-25 14:17:35,620 - ST_ACENet_test - INFO - Loaded model (epoch 27, val_loss 0.2405). Scaler: mean=58.4352, std=13.0981
+2026-02-25 14:17:35,620 - ST_ACENet_test - INFO - Starting Evaluation...
+2026-02-25 14:17:37,607 - ST_ACENet_test - INFO - Prediction shape: (6832, 12, 207), Ground truth shape: (6832, 12, 207)
+2026-02-25 14:17:37,607 - ST_ACENet_test - INFO - === Multi-Horizon Evaluation ===
+2026-02-25 14:17:37,624 - ST_ACENet_test - INFO - Performance (5-minute Horizon):
+2026-02-25 14:17:37,629 - ST_ACENet_test - INFO -   MAE:  2.1929
+2026-02-25 14:17:37,629 - ST_ACENet_test - INFO -   MSE:  14.8856
+2026-02-25 14:17:37,629 - ST_ACENet_test - INFO -   RMSE: 3.8582
+2026-02-25 14:17:37,629 - ST_ACENet_test - INFO -   MAPE: 5.40%
+
+2026-02-25 14:17:37,638 - ST_ACENet_test - INFO - Performance (15-minute Horizon):
+2026-02-25 14:17:37,639 - ST_ACENet_test - INFO -   MAE:  2.8008
+2026-02-25 14:17:37,639 - ST_ACENet_test - INFO -   MSE:  28.8381
+2026-02-25 14:17:37,639 - ST_ACENet_test - INFO -   RMSE: 5.3701
+2026-02-25 14:17:37,639 - ST_ACENet_test - INFO -   MAPE: 7.60%
+
+2026-02-25 14:17:37,648 - ST_ACENet_test - INFO - Performance (30-minute Horizon):
+2026-02-25 14:17:37,649 - ST_ACENet_test - INFO -   MAE:  3.3850
+2026-02-25 14:17:37,649 - ST_ACENet_test - INFO -   MSE:  43.4342
+2026-02-25 14:17:37,649 - ST_ACENet_test - INFO -   RMSE: 6.5905
+2026-02-25 14:17:37,649 - ST_ACENet_test - INFO -   MAPE: 9.83%
+
+2026-02-25 14:17:37,658 - ST_ACENet_test - INFO - Performance (60-minute Horizon):
+2026-02-25 14:17:37,658 - ST_ACENet_test - INFO -   MAE:  4.2219
+2026-02-25 14:17:37,658 - ST_ACENet_test - INFO -   MSE:  65.2459
+2026-02-25 14:17:37,658 - ST_ACENet_test - INFO -   RMSE: 8.0775
+2026-02-25 14:17:37,658 - ST_ACENet_test - INFO -   MAPE: 13.09%
+
+2026-02-25 14:17:37,674 - ST_ACENet_test - INFO - === ST_ACENet Uncertainty Evaluation ===
+2026-02-25 14:17:37,680 - ST_ACENet_test - INFO - Uncertainty (5-minute Horizon):
+2026-02-25 14:17:37,680 - ST_ACENet_test - INFO -   Avg Sigma (orig scale): 3.2777
+2026-02-25 14:17:37,680 - ST_ACENet_test - INFO -   Gaussian NLL:           1.5308
+
+2026-02-25 14:17:37,684 - ST_ACENet_test - INFO - Uncertainty (15-minute Horizon):
+2026-02-25 14:17:37,684 - ST_ACENet_test - INFO -   Avg Sigma (orig scale): 4.3196
+2026-02-25 14:17:37,684 - ST_ACENet_test - INFO -   Gaussian NLL:           1.8109
+
+2026-02-25 14:17:37,688 - ST_ACENet_test - INFO - Uncertainty (30-minute Horizon):
+2026-02-25 14:17:37,688 - ST_ACENet_test - INFO -   Avg Sigma (orig scale): 5.2229
+2026-02-25 14:17:37,688 - ST_ACENet_test - INFO -   Gaussian NLL:           2.0331
+
+2026-02-25 14:17:37,691 - ST_ACENet_test - INFO - Uncertainty (60-minute Horizon):
+2026-02-25 14:17:37,691 - ST_ACENet_test - INFO -   Avg Sigma (orig scale): 6.4614
+2026-02-25 14:17:37,691 - ST_ACENet_test - INFO -   Gaussian NLL:           2.2768
+

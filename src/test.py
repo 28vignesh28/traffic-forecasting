@@ -45,9 +45,12 @@ def test_unified_model(model_name, config_path="src/config.yaml"):
     horizon  = config['training']['horizon']
 
     if model_name == "CADGT":
+        cadgt_overrides = config.get('model_overrides', {}).get('CADGT', {})
         model = CADGT(
             num_nodes=nodes, seq_len=window, future_len=horizon,
-            ctx_dim=features - 1, d_model=hidden_dim, static_adj=adj_static
+            ctx_dim=features - 1,
+            d_model=cadgt_overrides.get('hidden_dim', hidden_dim),
+            static_adj=adj_static
         ).to(device)
     elif model_name == "CAMT":
         camt_overrides = config.get('model_overrides', {}).get('CAMT', {})
@@ -57,12 +60,18 @@ def test_unified_model(model_name, config_path="src/config.yaml"):
             seq_len=window, short_horizon=short_horizon, horizon=horizon
         ).to(device)
     elif model_name == "AMC_DSTGNN":
+        amc_overrides = config.get('model_overrides', {}).get('AMC_DSTGNN', {})
         model = AMC_DSTGNN(
-            nfeat=features, N=nodes, hidden_dim=128, horizon=horizon
+            nfeat=features, N=nodes,
+            hidden_dim=amc_overrides.get('hidden_dim', 128),
+            horizon=horizon
         ).to(device)
     elif model_name == "ST_ACENet":
+        ace_overrides = config.get('model_overrides', {}).get('ST_ACENet', {})
         model = ST_ACENet(
-            nfeat=features, N=nodes, horizon=horizon, static_adj=adj_static
+            nfeat=features, N=nodes,
+            hidden_dim=ace_overrides.get('hidden_dim', 64),
+            horizon=horizon, static_adj=adj_static
         ).to(device)
     else:
         raise ValueError(f"Unknown model {model_name}")

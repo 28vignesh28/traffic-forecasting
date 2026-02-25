@@ -1,0 +1,39 @@
+2026-02-25 13:52:46,862 - CADGT - INFO - === Starting unified runner for CADGT ===
+2026-02-25 13:52:48,426 - CADGT - INFO - [CADGT] Initializing Unified Training Pipeline on cuda
+2026-02-25 13:52:48,426 - CADGT - INFO - [CADGT] Calling get_dataloaders...
+2026-02-25 13:52:49,214 - CADGT - INFO - [CADGT] Data Loaded: 207 Nodes, 10 Features (Traffic + Context)
+2026-02-25 13:52:49,215 - CADGT - INFO - [CADGT] Loading Physical adjacency matrix...
+2026-02-25 13:52:49,765 - CADGT - WARNING - Adjacency row-sums vary significantly (max deviation: 4.01). This may indicate unnormalized or corrupted adjacency data.
+2026-02-25 13:52:49,771 - CADGT - INFO - [CADGT] Building Architecture...
+2026-02-25 13:52:50,437 - CADGT - INFO - [CADGT] Starting Training for 60 epochs...
+2026-02-25 13:53:57,779 - CADGT - INFO - Epoch 001 | Train Loss: 0.2770 | Val Loss: 0.2352 | Val MAE: 0.2352 | Time: 67.34s
+2026-02-25 13:53:57,789 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 13:55:06,413 - CADGT - INFO - Epoch 002 | Train Loss: 0.2470 | Val Loss: 0.2267 | Val MAE: 0.2267 | Time: 68.62s
+2026-02-25 13:55:06,420 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 13:56:16,244 - CADGT - INFO - Epoch 003 | Train Loss: 0.2360 | Val Loss: 0.2198 | Val MAE: 0.2198 | Time: 69.82s
+2026-02-25 13:56:16,249 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 13:57:26,534 - CADGT - INFO - Epoch 004 | Train Loss: 0.2298 | Val Loss: 0.2194 | Val MAE: 0.2194 | Time: 70.28s
+2026-02-25 13:57:26,541 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 13:58:36,884 - CADGT - INFO - Epoch 005 | Train Loss: 0.2260 | Val Loss: 0.2182 | Val MAE: 0.2182 | Time: 70.34s
+2026-02-25 13:58:36,890 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 13:59:46,847 - CADGT - INFO - Epoch 006 | Train Loss: 0.2230 | Val Loss: 0.2178 | Val MAE: 0.2178 | Time: 69.96s
+2026-02-25 13:59:46,855 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 14:00:56,829 - CADGT - INFO - Epoch 007 | Train Loss: 0.2211 | Val Loss: 0.2163 | Val MAE: 0.2163 | Time: 69.97s
+2026-02-25 14:00:56,834 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 14:02:06,694 - CADGT - INFO - Epoch 008 | Train Loss: 0.2189 | Val Loss: 0.2161 | Val MAE: 0.2161 | Time: 69.86s
+2026-02-25 14:02:06,699 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 14:03:16,604 - CADGT - INFO - Epoch 009 | Train Loss: 0.2176 | Val Loss: 0.2166 | Val MAE: 0.2166 | Time: 69.91s
+2026-02-25 14:04:26,621 - CADGT - INFO - Epoch 010 | Train Loss: 0.2164 | Val Loss: 0.2154 | Val MAE: 0.2154 | Time: 70.02s
+2026-02-25 14:04:26,628 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 14:05:36,549 - CADGT - INFO - Epoch 011 | Train Loss: 0.2144 | Val Loss: 0.2154 | Val MAE: 0.2154 | Time: 69.92s
+2026-02-25 14:06:46,112 - CADGT - INFO - Epoch 012 | Train Loss: 0.2133 | Val Loss: 0.2143 | Val MAE: 0.2143 | Time: 69.56s
+2026-02-25 14:06:46,117 - CADGT - INFO -   -> Saved Best Model (+ scaler) to saved_models\cadgt_best.pth
+2026-02-25 14:07:55,782 - CADGT - INFO - Epoch 013 | Train Loss: 0.2123 | Val Loss: 0.2169 | Val MAE: 0.2169 | Time: 69.66s
+2026-02-25 14:09:05,317 - CADGT - INFO - Epoch 014 | Train Loss: 0.2106 | Val Loss: 0.2142 | Val MAE: 0.2142 | Time: 69.53s
+2026-02-25 14:10:14,813 - CADGT - INFO - Epoch 015 | Train Loss: 0.2094 | Val Loss: 0.2168 | Val MAE: 0.2168 | Time: 69.49s
+2026-02-25 14:11:24,682 - CADGT - INFO - Epoch 016 | Train Loss: 0.2085 | Val Loss: 0.2155 | Val MAE: 0.2155 | Time: 69.87s
+2026-02-25 14:12:34,191 - CADGT - INFO - Epoch 017 | Train Loss: 0.2078 | Val Loss: 0.2169 | Val MAE: 0.2169 | Time: 69.51s
+2026-02-25 14:13:43,717 - CADGT - INFO - Epoch 018 | Train Loss: 0.2066 | Val Loss: 0.2190 | Val MAE: 0.2190 | Time: 69.53s
+2026-02-25 14:14:53,623 - CADGT - INFO - Epoch 019 | Train Loss: 0.2030 | Val Loss: 0.2189 | Val MAE: 0.2189 | Time: 69.91s
+2026-02-25 14:16:03,771 - CADGT - INFO - Epoch 020 | Train Loss: 0.2023 | Val Loss: 0.2173 | Val MAE: 0.2173 | Time: 70.15s
+2026-02-25 14:16:03,772 - CADGT - INFO - [CADGT] Early Stopping triggered at Epoch 20

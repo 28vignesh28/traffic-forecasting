@@ -25,3 +25,5 @@ model_overrides:
     dropout: 0.3
   CAMT:
     short_horizon: 3
+  ST_ACENet:
+    hidden_dim: 64
