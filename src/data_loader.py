@@ -1,5 +1,6 @@
 import os
 import pickle
+import json
 import numpy as np
 import pandas as pd
 import requests
@@ -19,8 +20,7 @@ class StandardScaler:
         return (data - self.mean) / (self.std + 1e-5)
 
     def inverse_transform(self, data):
-        if isinstance(data, torch.Tensor):
-            return (data * self.std) + self.mean
+        # FIX #5: Removed redundant isinstance branch — same operation for both types
         return (data * self.std) + self.mean
 
 
@@ -32,7 +32,12 @@ def load_traffic(file_path):
     logger.info(f"Loading Traffic Data from {file_path}...")
     df = pd.read_hdf(file_path)
     
-    # Clean zeros and NaN
+    # FIX #6: Replace exact zeros with NaN for forward-fill.
+    # Note: In METR-LA, 0.0 typically indicates a sensor malfunction, not actual
+    # zero traffic speed. If your dataset has legitimate zero readings, remove this.
+    zero_count = (df == 0).sum().sum()
+    if zero_count > 0:
+        logger.warning(f"Replacing {zero_count} exact-zero readings with forward-fill.")
     df_clean = df.replace(0, np.nan)
     df_clean = df_clean.ffill().bfill()
     
@@ -40,9 +45,18 @@ def load_traffic(file_path):
     return traffic_array, df_clean.index
 
 
-def fetch_weather_api(lat, lon, start_date, end_date):
-    """Fetches weather from Open-Meteo API."""
-    logger.info(f"Fetching Weather Data ({start_date} to {end_date})...")
+def fetch_weather_api(lat, lon, start_date, end_date, cache_dir="data"):
+    """Fetches weather from Open-Meteo API with local CSV caching."""
+    cache_path = os.path.join(cache_dir, "weather_cache.csv")
+
+    # --- Load from cache if available ---
+    if os.path.exists(cache_path):
+        logger.info(f"Loading Weather Data from cache: {cache_path}")
+        df = pd.read_csv(cache_path, parse_dates=["time"])
+        return df
+
+    # --- Fetch from API (first run only) ---
+    logger.info(f"Fetching Weather Data from API ({start_date} to {end_date})...")
     url = "https://archive-api.open-meteo.com/v1/archive"
     params = {
         "latitude": lat, "longitude": lon,
@@ -50,41 +64,73 @@ def fetch_weather_api(lat, lon, start_date, end_date):
         "hourly": ["temperature_2m", "precipitation", "visibility", "windspeed_10m"],
         "timezone": "UTC"
     }
-    
+
     try:
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
-        
+
         df = pd.DataFrame(data["hourly"])
         df["time"] = pd.to_datetime(df["time"])
-        
-        # [FIX] Resample from hourly to 5-minute intervals using linear interpolation
-        # This provides sub-hourly weather variance across the 12 steps.
+
+        # Resample from hourly to 5-minute intervals using linear interpolation
         df = df.set_index("time").resample("5min").interpolate(method="linear").bfill().ffill().reset_index()
+
+        # Save to cache
+        os.makedirs(cache_dir, exist_ok=True)
+        df.to_csv(cache_path, index=False)
+        logger.info(f"Weather data cached to {cache_path}")
         return df
     except Exception as e:
-        logger.warning(f"  [Warning] Weather API failed ({e}). Using zeros.")
-        days = (pd.to_datetime(end_date) - pd.to_datetime(start_date)).days + 1
-        return pd.DataFrame({
-            "time": pd.date_range(start_date, periods=days * 288, freq="5min"),
-            "temperature_2m": 0, "precipitation": 0, "visibility": 10000, "windspeed_10m": 0
-        })
+        raise RuntimeError(
+            f"Weather API failed ({e}) and no cache exists at {cache_path}. "
+            f"Cannot proceed without weather data. Please check your internet "
+            f"connection and try again."
+        )
 
 
-def fetch_holiday_api(year=2012, country_code="US"):
-    """Fetches public holidays from Nager.Date API."""
-    logger.info(f"Fetching Holiday Data for {year}...")
+def fetch_holiday_api(year=2012, country_code="US", cache_dir="data"):
+    """Fetches public holidays from Nager.Date API with local JSON caching."""
+    cache_path = os.path.join(cache_dir, "holidays_cache.json")
+
+    # --- Load from cache if available ---
+    if os.path.exists(cache_path):
+        logger.info(f"Loading Holiday Data from cache: {cache_path}")
+        with open(cache_path, 'r') as f:
+            cached = json.load(f)
+        # Return dates for the requested year (cache stores all fetched years)
+        year_key = str(year)
+        if year_key in cached:
+            return set(pd.to_datetime(cached[year_key]).date)
+        # Year not in cache — fall through to fetch it
+        logger.info(f"Year {year} not in cache, fetching from API...")
+    else:
+        cached = {}
+
+    # --- Fetch from API (first run only per year) ---
+    logger.info(f"Fetching Holiday Data for {year} from API...")
     url = f"https://date.nager.at/api/v3/PublicHolidays/{year}/{country_code}"
-    
+
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         holidays = response.json()
-        return set(pd.to_datetime([h['date'] for h in holidays]).date)
+        date_strings = [h['date'] for h in holidays]
+
+        # Update cache with this year's data
+        cached[str(year)] = date_strings
+        os.makedirs(cache_dir, exist_ok=True)
+        with open(cache_path, 'w') as f:
+            json.dump(cached, f, indent=2)
+        logger.info(f"Holiday data for {year} cached to {cache_path}")
+
+        return set(pd.to_datetime(date_strings).date)
     except Exception as e:
-        logger.warning(f"  [Warning] Holiday API failed ({e}). Using empty set.")
-        return set()
+        raise RuntimeError(
+            f"Holiday API failed ({e}) and year {year} not found in cache at "
+            f"{cache_path}. Cannot proceed without holiday data. Please check "
+            f"your internet connection and try again."
+        )
 
 
 def add_time_features(timestamps, N):
@@ -110,7 +156,7 @@ def add_time_features(timestamps, N):
 
 
 def merge_features(traffic, timestamps, config, train_end=None):
-    """Merges all 14 features uniformly."""
+    """Merges all 10 features uniformly."""
     T, N = traffic.shape
     
     start_date = timestamps[0].strftime("%Y-%m-%d")
@@ -136,7 +182,7 @@ def merge_features(traffic, timestamps, config, train_end=None):
         if d in holiday_dates:
             holiday_feat[i] = 1
 
-    # 3. Time Features (8 features)
+    # 3. Time Features (4 features: ToD + DoW)
     time_feat = add_time_features(timestamps, N)
     
     # 4. Clean + Broadcast

@@ -7,10 +7,12 @@ from torch.utils.checkpoint import checkpoint
 class ContextEncoder(nn.Module):
     def __init__(self, in_dim=9, d_model=64):
         super().__init__()
+        # FIX #10: Added LayerNorm for stable gradient flow
         self.net = nn.Sequential(
             nn.Linear(in_dim, d_model),
             nn.ReLU(),
-            nn.Linear(d_model, d_model)
+            nn.Linear(d_model, d_model),
+            nn.LayerNorm(d_model)
         )
 
     def forward(self, c):
@@ -63,8 +65,9 @@ class TrafficProjection(nn.Module):
     def __init__(self, num_nodes=207, seq_len=12, d_model=64):
         super().__init__()
         self.linear       = nn.Linear(1, d_model)
-        self.temporal_emb = nn.Parameter(torch.randn(1, seq_len, 1, d_model))
-        self.spatial_emb  = nn.Parameter(torch.randn(1, 1, num_nodes, d_model))
+        # FIX #13: Scale learned embeddings to match Xavier-init magnitude
+        self.temporal_emb = nn.Parameter(torch.randn(1, seq_len, 1, d_model) * (d_model ** -0.5))
+        self.spatial_emb  = nn.Parameter(torch.randn(1, 1, num_nodes, d_model) * (d_model ** -0.5))
 
     def forward(self, x):
         x = x.unsqueeze(-1)   # [B, T, N, 1]
@@ -108,9 +111,8 @@ class STBlock(nn.Module):
         h_temp_flat = self.temporal_layer(h_temp_flat)
         h_temp      = h_temp_flat.view(B, N, T, D).permute(0, 2, 1, 3)  # [B,T,N,D]
 
-        # FIX #8: Per-timestep spatial aggregation using the full temporal graph
-        # einsum: for each (b,t): h_spatial[b,t,n,d] = Σ_m A[b,t,n,m] * h_temp[b,t,m,d]
-        h_spatial = torch.einsum('btnm,btmf->btnf', A, h_temp)
+        # FIX #8 + #11: Per-timestep spatial aggregation — matmul replaces einsum for speed
+        h_spatial = torch.matmul(A, h_temp)   # [B,T,N,N] × [B,T,N,D] → [B,T,N,D]
         h_spatial = F.relu(self.spatial_linear(h_spatial))
 
         # FIX #12: No double residual — TransformerEncoderLayer already
@@ -128,12 +130,22 @@ class CADGT(nn.Module):
       #12 — Double residual in STBlock removed.
     """
     def __init__(self, num_nodes=207, seq_len=12, future_len=12,
-                 ctx_dim=13, d_model=64):
+                 ctx_dim=13, d_model=64, static_adj=None):
         super().__init__()
         self.ctx_encoder = ContextEncoder(ctx_dim, d_model)
-        # FIX #7/#8: DynamicGraph now accepts d_model (updated signature)
-        self.graph       = DynamicGraph(d_model)
+        # Two separate graph generators — one per STBlock (avoids stale graph)
+        self.graph1      = DynamicGraph(d_model)
+        self.graph2      = DynamicGraph(d_model)
         self.proj        = TrafficProjection(num_nodes, seq_len, d_model)
+
+        # Physical road graph integration (optional)
+        if static_adj is not None:
+            adj_t = torch.FloatTensor(static_adj)
+            adj_t = adj_t / (adj_t.sum(dim=-1, keepdim=True) + 1e-8)
+            self.register_buffer('static_adj', adj_t)
+            self.alpha = nn.Parameter(torch.tensor(0.0))  # sigmoid(0)=0.5
+        else:
+            self.static_adj = None
 
         # Feature gate: fused traffic + context → gating weights
         self.feature_gate = nn.Sequential(
@@ -151,6 +163,14 @@ class CADGT(nn.Module):
             nn.Linear(256, future_len)
         )
 
+    def _blend_static(self, A_dyn):
+        """FIX #9: Blend dynamic adjacency with physical road graph if available."""
+        if self.static_adj is not None:
+            alpha = torch.sigmoid(self.alpha)
+            A_static = self.static_adj.unsqueeze(0).unsqueeze(0)  # [1, 1, N, N]
+            return alpha * A_static + (1 - alpha) * A_dyn
+        return A_dyn
+
     def forward(self, x_full):
         x = x_full[:, :, :, 0]    # Traffic  [B, T, N]
         c = x_full[:, :, :, 1:]   # Context  [B, T, N, ctx_dim]
@@ -161,22 +181,30 @@ class CADGT(nn.Module):
         # Project traffic to model dimension
         h = self.proj(x)                # [B, T, N, D]
 
-        # FIX #7/#8: Graph conditioned on traffic+context; returns [B, T, N, N]
-        A = self.graph(h, c_embed)
+        # Graph 1: conditioned on initial traffic+context
+        A1 = self.graph1(h, c_embed)    # [B, T, N, N]
+        A1 = self._blend_static(A1)     # FIX #9: blend via helper
 
         # Adaptive feature fusion gate
         gate_input = torch.cat([h, c_embed], dim=-1)   # [B, T, N, 2D]
-        alpha      = self.feature_gate(gate_input)      # [B, T, N, D]
-        h          = h * alpha
+        gate_alpha = self.feature_gate(gate_input)      # [B, T, N, D]
+        h          = h * gate_alpha
 
-        # Spatio-temporal blocks (each receives per-timestep graph)
-        # Gradient checkpointing: trade compute for VRAM savings (~2.5GB per block)
+        # STBlock 1
         if self.training:
-            h = checkpoint(self.st1, h, A, use_reentrant=False)
-            h = checkpoint(self.st2, h, A, use_reentrant=False)
+            h = checkpoint(self.st1, h, A1, use_reentrant=False)
         else:
-            h = self.st1(h, A)
-            h = self.st2(h, A)
+            h = self.st1(h, A1)
+
+        # Graph 2: recomputed from updated h (avoids stale graph)
+        A2 = self.graph2(h, c_embed)    # [B, T, N, N]
+        A2 = self._blend_static(A2)     # FIX #9: blend via helper
+
+        # STBlock 2
+        if self.training:
+            h = checkpoint(self.st2, h, A2, use_reentrant=False)
+        else:
+            h = self.st2(h, A2)
 
         # Readout: flatten time×feature, predict per-node future speeds
         B, T, N, D = h.shape

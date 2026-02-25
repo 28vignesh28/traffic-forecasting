@@ -1,0 +1,29 @@
+2026-02-25 00:41:43,672 - AMC_DSTGNN_test - INFO - Testing AMC_DSTGNN on cuda
+2026-02-25 00:41:47,717 - AMC_DSTGNN_test - INFO - Loaded model (epoch 37, val_loss 0.0840). Scaler: mean=58.4352, std=13.0981
+2026-02-25 00:41:47,717 - AMC_DSTGNN_test - INFO - Starting Evaluation...
+2026-02-25 00:41:51,840 - AMC_DSTGNN_test - INFO - Prediction shape: (6832, 12, 207), Ground truth shape: (6832, 12, 207)
+2026-02-25 00:41:51,841 - AMC_DSTGNN_test - INFO - === Multi-Horizon Evaluation ===
+2026-02-25 00:41:51,857 - AMC_DSTGNN_test - INFO - Performance (5-minute Horizon):
+2026-02-25 00:41:51,861 - AMC_DSTGNN_test - INFO -   MAE:  2.1398
+2026-02-25 00:41:51,861 - AMC_DSTGNN_test - INFO -   MSE:  13.9777
+2026-02-25 00:41:51,861 - AMC_DSTGNN_test - INFO -   RMSE: 3.7387
+2026-02-25 00:41:51,861 - AMC_DSTGNN_test - INFO -   MAPE: 5.12%
+
+2026-02-25 00:41:51,873 - AMC_DSTGNN_test - INFO - Performance (15-minute Horizon):
+2026-02-25 00:41:51,873 - AMC_DSTGNN_test - INFO -   MAE:  2.7217
+2026-02-25 00:41:51,873 - AMC_DSTGNN_test - INFO -   MSE:  27.6453
+2026-02-25 00:41:51,873 - AMC_DSTGNN_test - INFO -   RMSE: 5.2579
+2026-02-25 00:41:51,873 - AMC_DSTGNN_test - INFO -   MAPE: 7.16%
+
+2026-02-25 00:41:51,885 - AMC_DSTGNN_test - INFO - Performance (30-minute Horizon):
+2026-02-25 00:41:51,885 - AMC_DSTGNN_test - INFO -   MAE:  3.2953
+2026-02-25 00:41:51,885 - AMC_DSTGNN_test - INFO -   MSE:  42.7500
+2026-02-25 00:41:51,885 - AMC_DSTGNN_test - INFO -   RMSE: 6.5383
+2026-02-25 00:41:51,885 - AMC_DSTGNN_test - INFO -   MAPE: 9.29%
+
+2026-02-25 00:41:51,895 - AMC_DSTGNN_test - INFO - Performance (60-minute Horizon):
+2026-02-25 00:41:51,895 - AMC_DSTGNN_test - INFO -   MAE:  4.0940
+2026-02-25 00:41:51,895 - AMC_DSTGNN_test - INFO -   MSE:  63.9994
+2026-02-25 00:41:51,895 - AMC_DSTGNN_test - INFO -   RMSE: 8.0000
+2026-02-25 00:41:51,895 - AMC_DSTGNN_test - INFO -   MAPE: 12.25%
+

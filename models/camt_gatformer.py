@@ -48,16 +48,21 @@ class AdaptiveGraph(nn.Module):
 class DynamicGraph(nn.Module):
     def __init__(self, nodes, hidden_dim=32):
         super().__init__()
-        self.fc1 = nn.Linear(1, hidden_dim)
-        self.fc2 = nn.Linear(1, hidden_dim)
+        # Use Conv1d to extract multi-dimensional temporal features per node
+        # This avoids the rank-1 problem where Linear(1→D) maps scalars to collinear embeddings
+        self.conv1 = nn.Conv1d(1, hidden_dim, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(1, hidden_dim, kernel_size=3, padding=1)
 
     def forward(self, x):
         # x : [B, T, N]
-        # Use DIFFERENT temporal summaries for fc1 vs fc2 to produce higher-rank adjacency
-        summary_mean = x.mean(dim=1).unsqueeze(-1)   # [B, N, 1] — average trend
-        summary_last = x[:, -1, :].unsqueeze(-1)     # [B, N, 1] — current state
-        h1 = self.fc1(summary_mean)                   # [B, N, hidden_dim]
-        h2 = self.fc2(summary_last)                   # [B, N, hidden_dim]
+        B, T, N = x.shape
+        # Reshape to [B*N, 1, T] — each node's time series as a 1D signal
+        x_flat = x.permute(0, 2, 1).reshape(B * N, 1, T)  # [B*N, 1, T]
+        
+        # Extract multi-dimensional temporal features via Conv1d
+        h1 = self.conv1(x_flat).mean(dim=-1).view(B, N, -1)  # [B, N, hidden_dim]
+        h2 = self.conv2(x_flat).mean(dim=-1).view(B, N, -1)  # [B, N, hidden_dim]
+        
         A  = torch.matmul(h1, h2.transpose(-1, -2))
         A  = torch.softmax(torch.relu(A), dim=-1)
         return A   # [B, N, N]
@@ -70,39 +75,48 @@ class TrafficModel(nn.Module):
     Fixes applied:
       #5  — GraphLayer now projects feature dim (1→128), not node dim (207→128).
       #11 — Short-term auxiliary loss weighted by 0.25 in train.py (not here).
+      #14 — ctx_dim, seq_len, horizon are now constructor parameters.
       #15 — adj_total is re-normalised with softmax after the three matrices
             are summed, preventing row-sums > 1 from causing over-smoothing.
       #17 — Context is no longer averaged across nodes (was a no-op);
             the full per-node, per-timestep context is used.
+      #18 — Conv1d uses causal (left-only) padding to prevent future leakage.
     """
-    def __init__(self, nodes):
+    def __init__(self, nodes, nfeat=10, seq_len=12, short_horizon=3, horizon=12):
         super().__init__()
-        self.adapt_graph  = AdaptiveGraph(nodes)
+        self.seq_len       = seq_len
+        self.short_horizon = short_horizon
+        self.horizon       = horizon
+
+        self.adapt_graph   = AdaptiveGraph(nodes)
         self.dynamic_graph = DynamicGraph(nodes)
 
         # FIX #5: in_features=1 (traffic feature dim), out_features=128
         self.graph = GraphLayer(in_features=1, out_features=128)
 
-        self.short = nn.Conv1d(128, 128, 3, padding=1)
+        # FIX #18: Causal Conv1d — left-pad with kernel_size-1, no right-pad
+        self.short_pad  = 2  # kernel_size - 1
+        self.short_conv = nn.Conv1d(128, 128, 3, padding=0)  # no built-in padding
 
         encoder = nn.TransformerEncoderLayer(
             d_model=128, nhead=8, batch_first=True
         )
         self.long = nn.TransformerEncoder(encoder, 2)
 
-        # FIX #17: context maps from 9 → 128 without squashing node dim
-        self.context = nn.Linear(9, 128)
+        # FIX #14: ctx_dim derived from nfeat (total features minus traffic)
+        ctx_dim = nfeat - 1
+        self.context = nn.Linear(ctx_dim, 128)
         self.gate    = nn.Linear(128, 128)
 
-        # Feature-level attention over all 10 features
+        # Feature-level attention over all features
         self.feature_attn = nn.Sequential(
-            nn.Linear(10, 1),
+            nn.Linear(nfeat, 1),
             nn.Sigmoid()
         )
 
-        # Temporal projection: Past [T=12] → Future horizons [3, 12]
-        self.short_temporal = nn.Linear(12, 3)
-        self.long_temporal  = nn.Linear(12, 12)
+        # FIX #19: Temporal projection uses parameterized dimensions
+        self.short_temporal = nn.Linear(seq_len, short_horizon)
+        self.long_temporal  = nn.Linear(seq_len, horizon)
 
         # FIX #5: output heads now produce per-node predictions (1 value/node)
         self.short_head = nn.Linear(128, 1)
@@ -110,10 +124,10 @@ class TrafficModel(nn.Module):
 
     def forward(self, x_full, adj_static):
         x_raw = x_full[:, :, :, 0]    # [B, T, N]
-        c     = x_full[:, :, :, 1:]   # [B, T, N, 13]
+        c     = x_full[:, :, :, 1:]   # [B, T, N, 9]
         B, T, N, _ = x_full.shape
 
-        # Adaptive feature gating over all 14 features
+        # Adaptive feature gating over all 10 features
         alpha = self.feature_attn(x_full).squeeze(-1)   # [B, T, N]
         x     = x_raw * alpha                            # [B, T, N]
 
@@ -143,10 +157,11 @@ class TrafficModel(nn.Module):
         # Reshape: [B, T, N, 128] → [B*N, T, 128]
         x_flat = x_feat.permute(0, 2, 1, 3).reshape(B * N, T, 128)
 
-        # Short-term: Conv1d over time
-        s      = x_flat.permute(0, 2, 1)                # [B*N, 128, T]
-        s      = self.short(s)                           # [B*N, 128, T]
-        s      = s.permute(0, 2, 1)                      # [B*N, T, 128]
+        # Short-term: Causal Conv1d over time (FIX #18: left-pad only)
+        s      = x_flat.permute(0, 2, 1)                           # [B*N, 128, T]
+        s      = F.pad(s, (self.short_pad, 0))                     # left-pad only
+        s      = self.short_conv(s)                                # [B*N, 128, T]
+        s      = s.permute(0, 2, 1)                                # [B*N, T, 128]
 
         # Long-term: Transformer over time
         l      = self.long(x_flat)                       # [B*N, T, 128]
@@ -166,12 +181,10 @@ class TrafficModel(nn.Module):
         long_feat  = self.long_temporal(fused_T).transpose(1, 2)   # [B*N, 12, 128]
 
         # ---- Per-node Output (FIX #5: head maps 128→1, not 128→207) ----
-        # short_out: [B*N, 3, 1] → [B, N, 3] → [B, 3, N]
-        short_out = self.short_head(short_feat).squeeze(-1)         # [B*N, 3]
-        short_out = short_out.view(B, N, 3).transpose(1, 2)        # [B, 3, N]
+        short_out = self.short_head(short_feat).squeeze(-1)                           # [B*N, short_horizon]
+        short_out = short_out.view(B, N, self.short_horizon).transpose(1, 2)          # [B, short_horizon, N]
 
-        # long_out : [B*N, 12, 1] → [B, N, 12] → [B, 12, N]
-        long_out  = self.long_head(long_feat).squeeze(-1)           # [B*N, 12]
-        long_out  = long_out.view(B, N, 12).transpose(1, 2)        # [B, 12, N]
+        long_out  = self.long_head(long_feat).squeeze(-1)                             # [B*N, horizon]
+        long_out  = long_out.view(B, N, self.horizon).transpose(1, 2)                 # [B, horizon, N]
 
         return short_out, long_out

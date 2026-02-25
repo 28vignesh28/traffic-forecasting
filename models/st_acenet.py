@@ -78,7 +78,9 @@ class ST_ACENet(nn.Module):
         self.alpha_layer = nn.Linear(fusion_dim, 1)
         self.fusion_fc   = nn.Linear(fusion_dim, hidden_dim)
 
-        self.short_branch  = nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, padding=1)
+        # FIX #27: Causal Conv1d — left-pad only to prevent future leakage
+        self.short_pad     = 2  # kernel_size - 1
+        self.short_branch  = nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, padding=0)
         self.long_branch   = nn.GRU(hidden_dim, hidden_dim, batch_first=True)
         self.temporal_gate = nn.Linear(hidden_dim * 2, hidden_dim)
 
@@ -114,8 +116,9 @@ class ST_ACENet(nn.Module):
         # Multi-Scale Temporal Modelling
         z_flat  = z.permute(0, 2, 1, 3).contiguous().reshape(B * N, T, -1)
 
-        # Short-term (Conv1d)
+        # Short-term (Causal Conv1d — FIX #27: left-pad only)
         z_short = z_flat.permute(0, 2, 1)
+        z_short = F.pad(z_short, (self.short_pad, 0))    # left-pad only
         z_short = F.relu(self.short_branch(z_short))
         z_short = z_short[:, :, -1]
 
@@ -142,6 +145,9 @@ class ST_ACENet(nn.Module):
         # A floor of 0.1 keeps the loss well-behaved across all epochs.
         # =================================================================
         raw_sigma = self.fc_sigma(h).view(B, N, self.horizon).transpose(1, 2)
-        sigma     = F.softplus(raw_sigma) + 0.1   # FIX #1: floor 0.001 → 0.1
+        # Monotonic sigma: each horizon step adds a non-negative increment
+        # cumsum of softplus ensures σ[h+1] ≥ σ[h] by construction
+        sigma_increments = F.softplus(raw_sigma)       # [B, horizon, N], all ≥ 0
+        sigma = torch.cumsum(sigma_increments, dim=1) + 0.1  # monotonic + floor
 
         return mu, sigma

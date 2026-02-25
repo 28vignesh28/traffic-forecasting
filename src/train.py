@@ -51,7 +51,7 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
 
     # 3. Model Initialization
     adj_static = None
-    if model_name in ["CAMT", "AMC_DSTGNN", "ST_ACENet"]:
+    if model_name in ["CADGT", "CAMT", "AMC_DSTGNN", "ST_ACENet"]:
         logger.info(f"[{model_name}] Loading Physical adjacency matrix...")
         adj_static = load_static_adj(config['data']['adj_path'])
         adj_tensor = torch.FloatTensor(adj_static).to(device)
@@ -63,12 +63,19 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
             seq_len=config['training']['window'],
             future_len=config['training']['horizon'],
             ctx_dim=features - 1,
-            d_model=config['model_defaults']['hidden_dim']
+            d_model=config['model_defaults']['hidden_dim'],
+            static_adj=adj_static
         ).to(device)
         loss_fn = nn.L1Loss()
 
     elif model_name == "CAMT":
-        model   = CAMT_GATformer(nodes=nodes).to(device)
+        short_horizon = 3  # CAMT short branch horizon
+        model   = CAMT_GATformer(
+            nodes=nodes, nfeat=features,
+            seq_len=config['training']['window'],
+            short_horizon=short_horizon,
+            horizon=config['training']['horizon']
+        ).to(device)
         loss_fn = nn.HuberLoss()
 
     elif model_name == "AMC_DSTGNN":
@@ -95,7 +102,9 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
         optimizer, mode='min', factor=0.5, patience=3
     )
 
-    use_amp      = 'cuda' in str(device)
+    # FIX #31: Use device.type for correct autocast on both CPU and CUDA
+    device_type  = device.type
+    use_amp      = device_type == 'cuda'
     grad_scaler  = torch.amp.GradScaler('cuda') if use_amp else None
 
     # 5. Training Loop
@@ -120,7 +129,7 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
             x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
 
-            with torch.amp.autocast('cuda', enabled=use_amp):
+            with torch.amp.autocast(device_type, enabled=use_amp):
                 if model_name == "CADGT":
                     preds = model(x)
                     loss  = loss_fn(preds, y)
@@ -134,7 +143,8 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
                     # branch received 4× the per-step gradient of the long branch,
                     # over-biasing the auxiliary objective.
                     # ===========================================================
-                    loss = 0.25 * loss_fn(ps_short, y[:, :3, :]) + loss_fn(pl_long, y)
+                    # FIX #34: Use config-derived short_horizon, not hardcoded 3
+                    loss = 0.25 * loss_fn(ps_short, y[:, :short_horizon, :]) + loss_fn(pl_long, y)
 
                 elif model_name == "AMC_DSTGNN":
                     # ===========================================================
@@ -176,13 +186,13 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
             for x, y in val_loader:
                 x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
 
-                with torch.amp.autocast('cuda', enabled=use_amp):
+                with torch.amp.autocast(device_type, enabled=use_amp):
                     if model_name == "CADGT":
                         preds = model(x)
                         loss  = loss_fn(preds, y)
                     elif model_name == "CAMT":
                         ps_short, pl_long = model(x, adj_tensor)
-                        loss = 0.25 * loss_fn(ps_short, y[:, :3, :]) + loss_fn(pl_long, y)
+                        loss = 0.25 * loss_fn(ps_short, y[:, :short_horizon, :]) + loss_fn(pl_long, y)
                     elif model_name == "AMC_DSTGNN":
                         preds = model(x, adj_tensor, teacher_forcing_ratio=0.0)
                         loss  = loss_fn(preds, y)

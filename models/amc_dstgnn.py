@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import random
 
 
 class DynamicGraphGenerator(nn.Module):
@@ -11,9 +10,10 @@ class DynamicGraphGenerator(nn.Module):
     - Dynamic Graph  : Learned from current traffic state, Top-K sparsified
     - Alpha          : Learnable blend weight — initialised so sigmoid(0)=0.5
     """
-    def __init__(self, N, hidden_dim):
+    def __init__(self, N, hidden_dim, k=10):
         super(DynamicGraphGenerator, self).__init__()
         self.N = N
+        self.k = k
         self.fc_start = nn.Linear(1, 16)
 
         # =================================================================
@@ -44,7 +44,7 @@ class DynamicGraphGenerator(nn.Module):
         # Fix: fill non-selected positions with -inf so exp(-inf) = 0,
         # making softmax truly zero those connections out.
         # =================================================================
-        k = 10
+        k = self.k
         topk_values, topk_indices = torch.topk(A_dyn, k, dim=2)
         mask = torch.full_like(A_dyn, float('-inf'))
         sparse_A_dyn = mask.scatter_(2, topk_indices, topk_values)
@@ -74,27 +74,27 @@ class ChebConvLayer(nn.Module):
         L̃    = 2*L / λ_max - I       [scaled to eigenvalue range [-1, 1]]
     Chebyshev polynomials are then computed on L̃.
     """
-    def __init__(self, K, in_f, out_f):
+    def __init__(self, K, in_f, out_f, N=207):
         super(ChebConvLayer, self).__init__()
         self.K     = K
         self.out_f = out_f
         self.Theta = nn.Parameter(torch.FloatTensor(K, in_f, out_f))
         nn.init.xavier_uniform_(self.Theta)
+        # FIX #20: Cache identity matrix as a buffer to avoid per-forward allocation
+        self.register_buffer('I', torch.eye(N))
 
     def forward(self, x, A):
         B, T, N, Fin = x.shape
 
-        # --- FIX #3: Proper Graph Laplacian ---
-        # Degree matrix
-        degree = A.sum(dim=-1)                    # [B, N]
-        D      = torch.diag_embed(degree)         # [B, N, N]
-        L      = D - A                            # [B, N, N]  Laplacian
-
-        I = torch.eye(N, device=x.device).unsqueeze(0).expand(B, -1, -1)
-
-        # λ_max approximated by largest row-sum (largest degree)
-        lambda_max = degree.max(dim=-1)[0].view(B, 1, 1).clamp(min=1.0)
-        L_scaled   = 2.0 * L / lambda_max - I    # Scaled Laplacian ∈ [-1, 1]
+        # --- Symmetric Normalised Laplacian (eigenvalues always in [0, 2]) ---
+        # L_sym = I - D^{-½} A D^{-½}
+        # Scaled: L̃ = L_sym - I  → eigenvalues in [-1, 1] ✓
+        degree = A.sum(dim=-1).clamp(min=1e-8)        # [B, N]
+        D_inv_sqrt = torch.diag_embed(1.0 / torch.sqrt(degree))  # [B, N, N]
+        # FIX #20: Use cached identity buffer
+        I = self.I.unsqueeze(0).expand(B, -1, -1)        # [B, N, N]
+        L_sym    = I - D_inv_sqrt @ A @ D_inv_sqrt    # [B, N, N]
+        L_scaled = L_sym - I                           # eigenvalues in [-1, 1]
 
         outputs    = torch.zeros(B, T, N, self.out_f, device=x.device)
         T_k_prev2  = None
@@ -156,7 +156,7 @@ class AMC_DSTGNN(nn.Module):
         self.graph_gen  = DynamicGraphGenerator(N, hidden_dim)
         self.context_fc = nn.Linear(nfeat - 1, 32)
         self.tcn        = TemporalConvNet(1, 32, kernel_size=3)
-        self.cheb_conv  = ChebConvLayer(K=3, in_f=32, out_f=32)
+        self.cheb_conv  = ChebConvLayer(K=3, in_f=32, out_f=32, N=N)
         self.attn_fc    = nn.Linear(32 + 32 + 1, 1)
         self.encoder_gru = nn.GRU(32 + 32 + 1, hidden_dim, batch_first=True)
 
@@ -208,9 +208,15 @@ class AMC_DSTGNN(nn.Module):
             prediction   = self.fc_out(hidden_state)   # [B*N, 1]
             outputs.append(prediction)
 
-            # Teacher Forcing
-            if self.training and y is not None and random.random() < teacher_forcing_ratio:
-                current_input = y[:, step, :].reshape(B * N, 1)
+            # FIX #22: Teacher forcing via torch.bernoulli for reproducibility
+            if self.training and y is not None and teacher_forcing_ratio > 0:
+                use_teacher = torch.bernoulli(
+                    torch.full((1,), teacher_forcing_ratio, device=prediction.device)
+                ).bool().item()
+                if use_teacher:
+                    current_input = y[:, step, :].reshape(B * N, 1)
+                else:
+                    current_input = prediction
             else:
                 current_input = prediction
 

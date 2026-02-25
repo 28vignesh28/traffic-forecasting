@@ -3,8 +3,6 @@ data:
   adj_path: "data/adj_METR-LA.pkl"
   lat: 34.05
   lon: -118.25
-  start_date: "2018-03-01"
-  days_to_fetch: 120 # Approximately 4 months of data to match METR-LA
 
 training:
   batch_size: 64
@@ -16,6 +14,14 @@ training:
   window: 12  # Historical sequence length (5-min intervals -> 1 hour)
   horizon: 12 # Future prediction sequence length (5-min intervals -> 1 hour)
 
+# FIX #46: Per-model configuration sections
 model_defaults:
   hidden_dim: 64
   dropout: 0.3
+
+model_overrides:
+  AMC_DSTGNN:
+    hidden_dim: 128
+    dropout: 0.3
+  CAMT:
+    short_horizon: 3

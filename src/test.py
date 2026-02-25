@@ -30,15 +30,16 @@ def test_unified_model(model_name, config_path="src/config.yaml"):
     logger.info(f"Testing {model_name} on {device}")
 
     # ---- Load Data (only needed for the test_loader) ----
-    _, _, test_loader, _, _ = get_dataloaders(config)
+    _, _, test_loader, _, dataset_info = get_dataloaders(config)
 
     adj_static = None
-    if model_name in ["CAMT", "AMC_DSTGNN", "ST_ACENet"]:
+    if model_name in ["CADGT", "CAMT", "AMC_DSTGNN", "ST_ACENet"]:
         adj_static = load_static_adj(config['data']['adj_path'])
         adj_tensor = torch.FloatTensor(adj_static).to(device)
 
-    nodes    = 207
-    features = 10
+    # FIX #36: Use dynamic values from the dataset instead of hardcoded constants
+    nodes    = dataset_info['num_nodes']
+    features = dataset_info['num_features']
     hidden_dim = config.get('model_defaults', {}).get('hidden_dim', 64)
     window   = config['training']['window']
     horizon  = config['training']['horizon']
@@ -46,10 +47,13 @@ def test_unified_model(model_name, config_path="src/config.yaml"):
     if model_name == "CADGT":
         model = CADGT(
             num_nodes=nodes, seq_len=window, future_len=horizon,
-            ctx_dim=features - 1, d_model=hidden_dim
+            ctx_dim=features - 1, d_model=hidden_dim, static_adj=adj_static
         ).to(device)
     elif model_name == "CAMT":
-        model = CAMT_GATformer(nodes=nodes).to(device)
+        model = CAMT_GATformer(
+            nodes=nodes, nfeat=features,
+            seq_len=window, short_horizon=3, horizon=horizon
+        ).to(device)
     elif model_name == "AMC_DSTGNN":
         model = AMC_DSTGNN(
             nfeat=features, N=nodes, hidden_dim=128, horizon=horizon
