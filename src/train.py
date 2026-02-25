@@ -198,10 +198,8 @@ def train_unified_model(model_name, config_path="src/config.yaml"):
                         loss  = loss_fn(preds, y)
                     elif model_name == "CAMT":
                         ps_short, pl_long = model(x, adj_tensor)
-                        # FIX #8: Use ONLY long-term loss for validation/checkpoint
-                        # selection. Including the auxiliary short-term loss biases
-                        # the checkpoint toward overfitting the short-term task.
-                        loss = loss_fn(pl_long, y)
+                        # Use same combined loss as training for consistent comparison
+                        loss = 0.25 * loss_fn(ps_short, y[:, :short_horizon, :]) + loss_fn(pl_long, y)
                     elif model_name == "AMC_DSTGNN":
                         preds = model(x, adj_tensor, teacher_forcing_ratio=0.0)
                         loss  = loss_fn(preds, y)

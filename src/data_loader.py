@@ -228,9 +228,10 @@ def merge_features(traffic, timestamps, config, train_end=None):
 
 
 class TrafficSequenceDataset(torch.utils.data.Dataset):
-    def __init__(self, X_merged, window=12, horizon=12, device="cpu"):
-        # Move entire dataset to GPU VRAM immediately to bypass PCIe bottleneck
-        self.X_merged = torch.FloatTensor(X_merged).to(device)
+    def __init__(self, X_merged, window=12, horizon=12):
+        # FIX: Keep data on CPU — DataLoader handles batching and GPU transfer.
+        # Previously loaded entire dataset into GPU VRAM, risking OOM on larger datasets.
+        self.X_merged = torch.FloatTensor(X_merged)
         self.window = window
         self.horizon = horizon
         self.length = len(X_merged) - window - horizon + 1
@@ -272,28 +273,35 @@ def get_dataloaders(config):
     val_data = X_merged[train_end:val_end]
     test_data = X_merged[val_end:]
     
-    # Create Dynamic PyTorch Datasets (No memory explosion)
+    # Create PyTorch Datasets — data stays on CPU, moved to GPU per-batch
     window = config['training']['window']
     horizon = config['training']['horizon']
-    
-    # Detect GPU and load datasets directly into VRAM
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"Loading full datasets directly into {device} VRAM to bypass PCIe bottlenecks...")
 
-    train_ds = TrafficSequenceDataset(train_data, window, horizon, device=device)
-    val_ds = TrafficSequenceDataset(val_data, window, horizon, device=device)
-    test_ds = TrafficSequenceDataset(test_data, window, horizon, device=device)
+    train_ds = TrafficSequenceDataset(train_data, window, horizon)
+    val_ds = TrafficSequenceDataset(val_data, window, horizon)
+    test_ds = TrafficSequenceDataset(test_data, window, horizon)
     
     batch_size = config['training']['batch_size']
+    use_cuda = torch.cuda.is_available()
     
-    # Convert to PyTorch DataLoaders (Disabled pin_memory for Windows stability)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
+    # pin_memory=True enables fast CPU→GPU transfers via page-locked memory
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,
+                              pin_memory=use_cuda, num_workers=0)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False,
+                            pin_memory=use_cuda, num_workers=0)
+    test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False,
+                             pin_memory=use_cuda, num_workers=0)
     
     # Extract structural dimensions
     num_nodes = X_merged.shape[1]
     num_features = X_merged.shape[2]
+
+    # FIX: Validate feature count matches model expectations
+    assert num_features == 10, (
+        f"Models expect 10 features [1 traffic + 4 weather + 1 holiday + 4 time], "
+        f"got {num_features}. Check merge_features()."
+    )
+
     dataset_info = {
         'num_nodes': num_nodes,
         'num_features': num_features
