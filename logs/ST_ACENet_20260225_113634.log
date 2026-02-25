@@ -1,0 +1,43 @@
+2026-02-25 11:36:34,920 - ST_ACENet - INFO - === Starting unified runner for ST_ACENet ===
+2026-02-25 11:36:35,410 - ST_ACENet - INFO - [ST_ACENet] Initializing Unified Training Pipeline on cuda
+2026-02-25 11:36:35,410 - ST_ACENet - INFO - [ST_ACENet] Calling get_dataloaders...
+2026-02-25 11:36:36,250 - ST_ACENet - INFO - [ST_ACENet] Data Loaded: 207 Nodes, 10 Features (Traffic + Context)
+2026-02-25 11:36:36,250 - ST_ACENet - INFO - [ST_ACENet] Loading Physical adjacency matrix...
+2026-02-25 11:36:36,407 - ST_ACENet - INFO - [ST_ACENet] Building Architecture...
+2026-02-25 11:36:37,199 - ST_ACENet - INFO - [ST_ACENet] Starting Training for 60 epochs...
+2026-02-25 11:36:47,142 - ST_ACENet - INFO - Epoch 001 | Train Loss: -0.1286 | Val Loss: -0.3670 | Time: 9.94s
+2026-02-25 11:36:47,148 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:36:56,678 - ST_ACENet - INFO - Epoch 002 | Train Loss: -0.3286 | Val Loss: -0.4463 | Time: 9.53s
+2026-02-25 11:36:56,682 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:37:06,504 - ST_ACENet - INFO - Epoch 003 | Train Loss: -0.3920 | Val Loss: -0.4651 | Time: 9.82s
+2026-02-25 11:37:06,509 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:37:16,445 - ST_ACENet - INFO - Epoch 004 | Train Loss: -0.4231 | Val Loss: -0.4980 | Time: 9.94s
+2026-02-25 11:37:16,449 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:37:26,427 - ST_ACENet - INFO - Epoch 005 | Train Loss: -0.4426 | Val Loss: -0.5056 | Time: 9.98s
+2026-02-25 11:37:26,429 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:37:36,438 - ST_ACENet - INFO - Epoch 006 | Train Loss: -0.4566 | Val Loss: -0.5079 | Time: 10.01s
+2026-02-25 11:37:36,441 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:37:46,422 - ST_ACENet - INFO - Epoch 007 | Train Loss: -0.4671 | Val Loss: -0.5178 | Time: 9.98s
+2026-02-25 11:37:46,424 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:37:56,390 - ST_ACENet - INFO - Epoch 008 | Train Loss: -0.4725 | Val Loss: -0.5189 | Time: 9.97s
+2026-02-25 11:37:56,391 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:38:06,341 - ST_ACENet - INFO - Epoch 009 | Train Loss: -0.4830 | Val Loss: -0.5166 | Time: 9.95s
+2026-02-25 11:38:16,279 - ST_ACENet - INFO - Epoch 010 | Train Loss: -0.4858 | Val Loss: -0.5320 | Time: 9.94s
+2026-02-25 11:38:16,282 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:38:26,187 - ST_ACENet - INFO - Epoch 011 | Train Loss: -0.4961 | Val Loss: -0.5262 | Time: 9.91s
+2026-02-25 11:38:35,859 - ST_ACENet - INFO - Epoch 012 | Train Loss: -0.5012 | Val Loss: -0.5230 | Time: 9.67s
+2026-02-25 11:38:45,546 - ST_ACENet - INFO - Epoch 013 | Train Loss: -0.5049 | Val Loss: -0.5343 | Time: 9.69s
+2026-02-25 11:38:45,549 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:38:55,190 - ST_ACENet - INFO - Epoch 014 | Train Loss: -0.5105 | Val Loss: -0.5335 | Time: 9.64s
+2026-02-25 11:39:05,004 - ST_ACENet - INFO - Epoch 015 | Train Loss: -0.5140 | Val Loss: -0.5328 | Time: 9.81s
+2026-02-25 11:39:14,979 - ST_ACENet - INFO - Epoch 016 | Train Loss: -0.5183 | Val Loss: -0.5392 | Time: 9.97s
+2026-02-25 11:39:14,984 - ST_ACENet - INFO -   -> Saved Best Model (+ scaler) to saved_models\st_acenet_best.pth
+2026-02-25 11:39:24,957 - ST_ACENet - INFO - Epoch 017 | Train Loss: -0.5251 | Val Loss: -0.5368 | Time: 9.97s
+2026-02-25 11:39:34,909 - ST_ACENet - INFO - Epoch 018 | Train Loss: -0.5281 | Val Loss: -0.5288 | Time: 9.95s
+2026-02-25 11:39:44,823 - ST_ACENet - INFO - Epoch 019 | Train Loss: -0.5276 | Val Loss: -0.5234 | Time: 9.91s
+2026-02-25 11:39:54,747 - ST_ACENet - INFO - Epoch 020 | Train Loss: -0.5313 | Val Loss: -0.5318 | Time: 9.92s
+2026-02-25 11:40:04,714 - ST_ACENet - INFO - Epoch 021 | Train Loss: -0.5459 | Val Loss: -0.5351 | Time: 9.97s
+2026-02-25 11:40:14,699 - ST_ACENet - INFO - Epoch 022 | Train Loss: -0.5480 | Val Loss: -0.5278 | Time: 9.99s
+2026-02-25 11:40:24,654 - ST_ACENet - INFO - Epoch 023 | Train Loss: -0.5509 | Val Loss: -0.5321 | Time: 9.96s
+2026-02-25 11:40:34,462 - ST_ACENet - INFO - Epoch 024 | Train Loss: -0.5509 | Val Loss: -0.5309 | Time: 9.81s
+2026-02-25 11:40:34,464 - ST_ACENet - INFO - [ST_ACENet] Early Stopping triggered at Epoch 24

@@ -1,0 +1,29 @@
+2026-02-25 11:43:50,987 - CADGT_test - INFO - Testing CADGT on cuda
+2026-02-25 11:43:52,272 - CADGT_test - INFO - Loaded model (epoch 12, val_loss 0.2143). Scaler: mean=58.4352, std=13.0981
+2026-02-25 11:43:52,272 - CADGT_test - INFO - Starting Evaluation...
+2026-02-25 11:43:59,799 - CADGT_test - INFO - Prediction shape: (6832, 12, 207), Ground truth shape: (6832, 12, 207)
+2026-02-25 11:43:59,799 - CADGT_test - INFO - === Multi-Horizon Evaluation ===
+2026-02-25 11:43:59,824 - CADGT_test - INFO - Performance (5-minute Horizon):
+2026-02-25 11:43:59,825 - CADGT_test - INFO -   MAE:  2.1287
+2026-02-25 11:43:59,825 - CADGT_test - INFO -   MSE:  14.3204
+2026-02-25 11:43:59,825 - CADGT_test - INFO -   RMSE: 3.7842
+2026-02-25 11:43:59,825 - CADGT_test - INFO -   MAPE: 5.18%
+
+2026-02-25 11:43:59,834 - CADGT_test - INFO - Performance (15-minute Horizon):
+2026-02-25 11:43:59,834 - CADGT_test - INFO -   MAE:  2.5976
+2026-02-25 11:43:59,834 - CADGT_test - INFO -   MSE:  26.4087
+2026-02-25 11:43:59,834 - CADGT_test - INFO -   RMSE: 5.1389
+2026-02-25 11:43:59,834 - CADGT_test - INFO -   MAPE: 6.88%
+
+2026-02-25 11:43:59,845 - CADGT_test - INFO - Performance (30-minute Horizon):
+2026-02-25 11:43:59,845 - CADGT_test - INFO -   MAE:  3.0022
+2026-02-25 11:43:59,845 - CADGT_test - INFO -   MSE:  38.4751
+2026-02-25 11:43:59,845 - CADGT_test - INFO -   RMSE: 6.2028
+2026-02-25 11:43:59,845 - CADGT_test - INFO -   MAPE: 8.71%
+
+2026-02-25 11:43:59,855 - CADGT_test - INFO - Performance (60-minute Horizon):
+2026-02-25 11:43:59,855 - CADGT_test - INFO -   MAE:  3.4693
+2026-02-25 11:43:59,855 - CADGT_test - INFO -   MSE:  52.9947
+2026-02-25 11:43:59,855 - CADGT_test - INFO -   RMSE: 7.2797
+2026-02-25 11:43:59,855 - CADGT_test - INFO -   MAPE: 10.74%
+
