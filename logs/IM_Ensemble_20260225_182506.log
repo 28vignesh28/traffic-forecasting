@@ -1,0 +1,85 @@
+2026-02-25 18:25:08,078 - IM_Ensemble - INFO - Inverse MAE^2 Ensemble on cuda
+2026-02-25 18:25:09,502 - IM_Ensemble - INFO - Loading CADGT...
+2026-02-25 18:25:09,561 - IM_Ensemble - INFO -   CADGT: val_MAE = 0.2143, scaler(mean=58.4352, std=13.0981)
+2026-02-25 18:25:09,561 - IM_Ensemble - INFO - Loading CAMT...
+2026-02-25 18:25:09,585 - IM_Ensemble - INFO -   CAMT: val_MAE = 0.2379, scaler(mean=58.4352, std=13.0981)
+2026-02-25 18:25:09,586 - IM_Ensemble - INFO - Loading AMC_DSTGNN...
+2026-02-25 18:25:09,673 - IM_Ensemble - INFO -   AMC_DSTGNN: val_MAE = 0.2351, scaler(mean=58.4352, std=13.0981)
+2026-02-25 18:25:09,673 - IM_Ensemble - INFO - Loading ST_ACENet...
+2026-02-25 18:25:09,682 - IM_Ensemble - INFO -   ST_ACENet: val_MAE = 0.2405, scaler(mean=58.4352, std=13.0981)
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - ============================================================
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - Quadratic Voting Weight Computation
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - ============================================================
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - Model              Val MAE     Budget      Votes     Weight
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - ------------------------------------------------------------
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - CADGT               0.2143     4.6667     2.1603     0.2599
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - CAMT                0.2379     4.2040     2.0504     0.2467
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - AMC_DSTGNN          0.2351     4.2528     2.0622     0.2481
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - ST_ACENet           0.2405     4.1584     2.0392     0.2453
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - ------------------------------------------------------------
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - TOTAL                                     8.3121     1.0000
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - ============================================================
+2026-02-25 18:25:09,683 - IM_Ensemble - INFO - Running inference for CADGT...
+2026-02-25 18:25:17,331 - IM_Ensemble - INFO - Running inference for CAMT...
+2026-02-25 18:25:32,621 - IM_Ensemble - INFO - Running inference for AMC_DSTGNN...
+2026-02-25 18:25:36,800 - IM_Ensemble - INFO - Running inference for ST_ACENet...
+2026-02-25 18:25:38,999 - IM_Ensemble - INFO - 
+==========================================================================================
+2026-02-25 18:25:38,999 - IM_Ensemble - INFO - MULTI-HORIZON COMPARISON: Individual Models vs. Inverse MAE^2 Ensemble
+2026-02-25 18:25:38,999 - IM_Ensemble - INFO - ==========================================================================================
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO - 
+----------------------------------------------------------------------
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO -   5-MINUTE HORIZON
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO - ----------------------------------------------------------------------
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO -   Model                   MAE     RMSE  MAPE(%)
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO -   ------------------ -------- -------- --------
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO -   CADGT                2.1287   3.7842     5.18
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO -   CAMT                 2.5712   4.5399     6.91
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO -   AMC_DSTGNN           2.1470   3.8145     5.18
+2026-02-25 18:25:39,223 - IM_Ensemble - INFO -   ST_ACENet            2.1929   3.8582     5.40
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   ------------------ -------- -------- --------
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   * IM_Ensemble        2.1386   3.7644     5.32
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO - 
+----------------------------------------------------------------------
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   15-MINUTE HORIZON
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO - ----------------------------------------------------------------------
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   Model                   MAE     RMSE  MAPE(%)
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   ------------------ -------- -------- --------
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   CADGT                2.5976   5.1389     6.88
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   CAMT                 2.8980   5.4836     8.10
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   AMC_DSTGNN           2.7245   5.3423     7.24
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   ST_ACENet            2.8008   5.3701     7.60
+2026-02-25 18:25:39,224 - IM_Ensemble - INFO -   ------------------ -------- -------- --------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   * IM_Ensemble        2.6442   5.1301     7.15
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO - 
+----------------------------------------------------------------------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   30-MINUTE HORIZON
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO - ----------------------------------------------------------------------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   Model                   MAE     RMSE  MAPE(%)
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   ------------------ -------- -------- --------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   CADGT                3.0022   6.2028     8.71
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   CAMT                 3.2917   6.4261     9.57
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   AMC_DSTGNN           3.2990   6.6045     9.46
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   ST_ACENet            3.3850   6.5905     9.83
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   ------------------ -------- -------- --------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   * IM_Ensemble        3.1273   6.1831     9.10
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO - 
+----------------------------------------------------------------------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   60-MINUTE HORIZON
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO - ----------------------------------------------------------------------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   Model                   MAE     RMSE  MAPE(%)
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   ------------------ -------- -------- --------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   CADGT                3.4693   7.2797    10.74
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   CAMT                 4.0374   7.7934    12.14
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   AMC_DSTGNN           4.1152   8.0952    12.71
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   ST_ACENet            4.2219   8.0775    13.09
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   ------------------ -------- -------- --------
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   * IM_Ensemble        3.7856   7.3555    11.75
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO - 
+======================================================================
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO - VERDICT
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO - ======================================================================
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   Best individual 60-min MAE : 3.4693
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   IM Ensemble 60-min MAE     : 3.7856
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO -   [-] Ensemble is 9.12% worse (consider tuning weights or removing weak models)
+2026-02-25 18:25:39,225 - IM_Ensemble - INFO - ======================================================================

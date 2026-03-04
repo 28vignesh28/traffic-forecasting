@@ -1,0 +1,8 @@
+2026-02-26 17:55:19,241 - Simulation_Case_Study - INFO - Running Case Study Simulation for CADGT on cuda
+2026-02-26 17:55:20,530 - Simulation_Case_Study - INFO - Loaded CADGT model. Scaler: mean=58.4352, std=13.0981
+2026-02-26 17:55:20,530 - Simulation_Case_Study - INFO - Extracting continuous test stream...
+2026-02-26 17:55:20,989 - Simulation_Case_Study - INFO - Selected simulation window starting at step 94 for 150 steps.
+2026-02-26 17:55:20,994 - Simulation_Case_Study - INFO - Running CADGT predictions over simulation window...
+2026-02-26 17:55:21,244 - Simulation_Case_Study - INFO - Analyzing Node 91
+2026-02-26 17:55:21,922 - Simulation_Case_Study - INFO - Analyzing Node 196
+2026-02-26 17:55:22,663 - Simulation_Case_Study - INFO - Simulation completed. Outputs saved to visualizations\case_study

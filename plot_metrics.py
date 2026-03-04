@@ -55,6 +55,7 @@ def plot_metric(metric_name, ylabel):
         ax.bar(x + offset, values, width, label=model, color=colors[i], alpha=0.9)
     
     ax.set_ylabel(ylabel)
+    ax.set_xlabel("Prediction Horizon")
     ax.set_title(f"{metric_name} Comparison Across Horizons")
     ax.set_xticks(x)
     ax.set_xticklabels([f"{h} min" for h in horizons])

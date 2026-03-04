@@ -1,0 +1,46 @@
+2026-02-26 10:51:03,596 - CADGT_Analysis - INFO - Analysis on cuda
+2026-02-26 10:51:03,596 - CADGT_Analysis - INFO - Loading test data and computing conditions...
+2026-02-26 10:51:05,401 - CADGT_Analysis - INFO - Running baseline inference on test set...
+2026-02-26 10:51:13,504 - CADGT_Analysis - INFO - Defining condition masks...
+2026-02-26 10:51:13,515 - CADGT_Analysis - INFO - 
+========== CONDITION ANALYSIS (60-MIN HORIZON) ==========
+2026-02-26 10:51:13,515 - CADGT_Analysis - INFO - --- Baseline (All Data) ---
+2026-02-26 10:51:13,549 - CADGT_Analysis - INFO - --- All Data (6832 samples) ---
+2026-02-26 10:51:13,550 - CADGT_Analysis - INFO -   MAE:  3.4693
+2026-02-26 10:51:13,550 - CADGT_Analysis - INFO -   RMSE: 7.2797
+2026-02-26 10:51:13,550 - CADGT_Analysis - INFO -   MAPE: 10.74%
+2026-02-26 10:51:13,557 - CADGT_Analysis - INFO - --- Peak Hours (7-9 AM, 4-6 PM) (1152 samples) ---
+2026-02-26 10:51:13,558 - CADGT_Analysis - INFO -   MAE:  4.5420
+2026-02-26 10:51:13,558 - CADGT_Analysis - INFO -   RMSE: 8.8505
+2026-02-26 10:51:13,558 - CADGT_Analysis - INFO -   MAPE: 15.54%
+2026-02-26 10:51:13,573 - CADGT_Analysis - INFO - --- Off-Peak Hours (5680 samples) ---
+2026-02-26 10:51:13,574 - CADGT_Analysis - INFO -   MAE:  3.2518
+2026-02-26 10:51:13,574 - CADGT_Analysis - INFO -   RMSE: 6.9178
+2026-02-26 10:51:13,574 - CADGT_Analysis - INFO -   MAPE: 9.76%
+2026-02-26 10:51:13,574 - CADGT_Analysis - INFO - Holidays: No samples found.
+2026-02-26 10:51:13,595 - CADGT_Analysis - INFO - --- Non-Holidays (6832 samples) ---
+2026-02-26 10:51:13,596 - CADGT_Analysis - INFO -   MAE:  3.4693
+2026-02-26 10:51:13,596 - CADGT_Analysis - INFO -   RMSE: 7.2797
+2026-02-26 10:51:13,596 - CADGT_Analysis - INFO -   MAPE: 10.74%
+2026-02-26 10:51:13,596 - CADGT_Analysis - INFO - Abnormal Weather (Rain or Low Visibility): No samples found.
+2026-02-26 10:51:13,616 - CADGT_Analysis - INFO - --- Normal Weather (6832 samples) ---
+2026-02-26 10:51:13,616 - CADGT_Analysis - INFO -   MAE:  3.4693
+2026-02-26 10:51:13,616 - CADGT_Analysis - INFO -   RMSE: 7.2797
+2026-02-26 10:51:13,616 - CADGT_Analysis - INFO -   MAPE: 10.74%
+2026-02-26 10:51:13,616 - CADGT_Analysis - INFO - 
+========== NOISE SENSITIVITY ANALYSIS ==========
+2026-02-26 10:51:13,617 - CADGT_Analysis - INFO - Running inference with 10.0% Noise...
+2026-02-26 10:51:21,109 - CADGT_Analysis - INFO - --- Noise Level 10.0% ---
+2026-02-26 10:51:21,109 - CADGT_Analysis - INFO -   MAE:  3.4968
+2026-02-26 10:51:21,112 - CADGT_Analysis - INFO -   RMSE: 7.2894
+2026-02-26 10:51:21,112 - CADGT_Analysis - INFO -   MAPE: 10.82%
+2026-02-26 10:51:21,112 - CADGT_Analysis - INFO - Running inference with 20.0% Noise...
+2026-02-26 10:51:28,591 - CADGT_Analysis - INFO - --- Noise Level 20.0% ---
+2026-02-26 10:51:28,591 - CADGT_Analysis - INFO -   MAE:  3.5709
+2026-02-26 10:51:28,591 - CADGT_Analysis - INFO -   RMSE: 7.3330
+2026-02-26 10:51:28,591 - CADGT_Analysis - INFO -   MAPE: 11.05%
+2026-02-26 10:51:28,591 - CADGT_Analysis - INFO - Running inference with 50.0% Noise...
+2026-02-26 10:51:36,089 - CADGT_Analysis - INFO - --- Noise Level 50.0% ---
+2026-02-26 10:51:36,089 - CADGT_Analysis - INFO -   MAE:  3.9909
+2026-02-26 10:51:36,090 - CADGT_Analysis - INFO -   RMSE: 7.6920
+2026-02-26 10:51:36,090 - CADGT_Analysis - INFO -   MAPE: 12.29%

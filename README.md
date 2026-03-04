@@ -54,5 +54,16 @@ python src/test.py --model CADGT
 Every feature ingested by a model passes through `src/data_loader.py > get_dataloaders()`. The unified standard features list includes: `[Traffic Speed, Temperature, Precipitation, Visibility, Wind Speed, IsHoliday, TOD_sin, TOD_cos, DOW_sin, DOW_cos]`. 
 If you add an 11th feature, update the initialization size configurations dynamically within `train.py`.
 
+### 4. Quadratic Voting Ensemble
+After all 4 models are trained, combine their predictions using the Quadratic Voting ensemble:
+
+```bash
+python src/ensemble_qv.py
+```
+
+**How QV works:** Each model receives a "voice credit" budget inversely proportional to its validation MAE. Under QV, casting *v* votes costs *v²* credits, so effective votes = `√(1/MAE)`. Models with lower error earn disproportionately more influence, but no single model can dominate — this is the core democratic property of QV.
+
+The script outputs a side-by-side comparison table of all individual models vs. the ensemble at 5/15/30/60-minute horizons.
+
 ## License
 Provided for the Traffic Sequence Evaluation metrics review format.

@@ -27,3 +27,7 @@ model_overrides:
     short_horizon: 3
   ST_ACENet:
     hidden_dim: 64
+
+ensemble:
+  method: "quadratic_voting"
+  models: ["CADGT", "CAMT", "AMC_DSTGNN", "ST_ACENet"]
