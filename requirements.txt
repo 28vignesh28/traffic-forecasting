@@ -7,9 +7,9 @@ requests
 pyyaml
 matplotlib
 tensorboard
-streamlit
+streamlit>=1.35.0
 plotly
-altair<5
+tables
 openmeteo-requests
 requests-cache
 retry-requests
