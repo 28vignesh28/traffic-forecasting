@@ -536,7 +536,7 @@ with st.sidebar:
 
     sel_time = st.time_input(
         "🕐 Select Time",
-        value=datetime.time(8, 45),
+        value=datetime.time(8, 00),
         step=datetime.timedelta(minutes=5),
         help="24-hour format, 5-minute intervals",
     )
