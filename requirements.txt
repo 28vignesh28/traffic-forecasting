@@ -7,3 +7,8 @@ requests
 pyyaml
 matplotlib
 tensorboard
+streamlit
+plotly
+openmeteo-requests
+requests-cache
+retry-requests
