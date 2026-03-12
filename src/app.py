@@ -1,21 +1,17 @@
 """
 Traffic Flow Forecasting & Congestion Behaviour Analysis Dashboard
 AI-powered traffic prediction using CADGT (Context-Aware Dynamic Graph Transformer)
-Merged: Teammate's premium dark theme + Live API future forecasting
 """
 
 import os
 import sys
 import json
-import time
 import pickle
 import datetime
 import numpy as np
 import pandas as pd
 import torch
 import streamlit as st
-import plotly.graph_objects as go
-import requests
 
 # ---------------------------------------------------------------------------
 # Ensure project root is on sys.path so model imports work
@@ -268,6 +264,7 @@ def load_traffic_data():
     """Load the METR-LA HDF5 dataset and return DataFrame + raw array."""
     h5_path = os.path.join(PROJECT_ROOT, "data", "METR-LA.h5")
     df = pd.read_hdf(h5_path)
+    # Replace sensor-malfunction zeros with forward fill
     df_clean = df.replace(0, np.nan).ffill().bfill()
     return df_clean
 
@@ -285,8 +282,12 @@ def load_model():
     checkpoint = torch.load(ckpt_path, map_location=device)
 
     model = CADGT(
-        num_nodes=207, seq_len=12, future_len=12,
-        ctx_dim=9, d_model=64, static_adj=adj_mx,
+        num_nodes=207,
+        seq_len=12,
+        future_len=12,
+        ctx_dim=9,   # 10 features - 1 (traffic)
+        d_model=64,
+        static_adj=adj_mx,
     ).to(device)
     model.load_state_dict(checkpoint["model"])
     model.eval()
@@ -301,6 +302,7 @@ def load_model():
 def load_weather_cache():
     """Load the largest weather cache CSV."""
     data_dir = os.path.join(PROJECT_ROOT, "data")
+    # Pick the larger CSV (full dataset range)
     candidates = [f for f in os.listdir(data_dir) if f.startswith("weather_cache_") and f.endswith(".csv")]
     if not candidates:
         return None
@@ -324,81 +326,22 @@ def load_holidays():
     return all_dates
 
 
-@st.cache_data(show_spinner=False)
-def load_average_profile():
-    """Load pre-computed average traffic profile for future forecasting."""
-    path = os.path.join(PROJECT_ROOT, "data", "computed", "average_traffic_profile.npy")
-    if os.path.exists(path):
-        return np.load(path)
-    return np.zeros((288, 7, 207))
-
-
 # ──────────────────────────────────────────────────────────────────────────────
-# Live API helpers (for Future Forecast tab)
-# ──────────────────────────────────────────────────────────────────────────────
-
-@st.cache_data(ttl=3600)
-def fetch_future_weather(lat, lon, target_date):
-    """Fetches hourly weather forecast from Open-Meteo for a future date, or historical archive for past dates."""
-    today = datetime.datetime.now().date()
-    
-    # Open-Meteo requires different endpoints for past vs future
-    if target_date.date() < today:
-        url = "https://archive-api.open-meteo.com/v1/archive"
-    else:
-        url = "https://api.open-meteo.com/v1/forecast"
-        
-    params = {
-        "latitude": lat, "longitude": lon,
-        "hourly": ["temperature_2m", "precipitation", "visibility", "windspeed_10m"],
-        "timezone": "America/Los_Angeles",
-        "start_date": target_date.strftime("%Y-%m-%d"),
-        "end_date": (target_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-    }
-    
-    # Archive API doesn't have visibility, provide default if needed
-    if "archive" in url:
-        params["hourly"] = ["temperature_2m", "precipitation", "windspeed_10m"]
-        
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        df = pd.DataFrame(data["hourly"])
-        df["time"] = pd.to_datetime(df["time"])
-        if "visibility" not in df.columns or df["visibility"].isnull().all():
-            df["visibility"] = 10000.0
-        return df
-    except Exception as e:
-        st.error(f"Failed to fetch weather data: {e}")
-        return None
-
-
-@st.cache_data(ttl=86400)
-def check_holiday_api(target_date):
-    """Checks if the given date is a US holiday via Nager.Date API."""
-    year = target_date.year
-    url = f"https://date.nager.at/api/v3/PublicHolidays/{year}/US"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            holidays = [datetime.datetime.strptime(h['date'], "%Y-%m-%d").date() for h in response.json()]
-            return target_date in holidays
-    except:
-        pass
-    return False
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Feature engineering helpers
+# Feature engineering helpers (mirrors data_loader.py logic)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def build_input_tensor(traffic_df, weather_df, holidays, target_ts, scaler_mean, scaler_std, num_nodes=207, window=12):
-    """Build the [1, 12, 207, 10] input tensor for CADGT from raw data."""
+    """
+    Build the [1, 12, 207, 10] input tensor for CADGT from raw data.
+    Returns (tensor, actual_timestamps, found_in_dataset).
+    """
     timestamps = traffic_df.index
+
+    # Find closest timestamp in dataset
     idx = timestamps.searchsorted(target_ts)
     idx = min(idx, len(timestamps) - 1)
 
+    # We need `window` steps ending at idx
     start = max(0, idx - window + 1)
     end = idx + 1
     if end - start < window:
@@ -406,12 +349,14 @@ def build_input_tensor(traffic_df, weather_df, holidays, target_ts, scaler_mean,
         end = window
 
     actual_ts = timestamps[start:end]
-    traffic_slice = traffic_df.iloc[start:end].values.astype(np.float32)
+    traffic_slice = traffic_df.iloc[start:end].values.astype(np.float32)  # [W, N]
 
-    found_in_dataset = abs((timestamps[idx] - target_ts).total_seconds()) < 600
+    found_in_dataset = abs((timestamps[idx] - target_ts).total_seconds()) < 600  # within 10 min
 
+    # Normalize traffic
     traffic_norm = (traffic_slice - scaler_mean) / (scaler_std + 1e-5)
 
+    # --- Weather features [W, 4] ---
     if weather_df is not None and len(weather_df) > 0:
         weather_indexed = weather_df.set_index("time")
         weather_aligned = weather_indexed.reindex(actual_ts, method="nearest")
@@ -420,15 +365,18 @@ def build_input_tensor(traffic_df, weather_df, holidays, target_ts, scaler_mean,
     else:
         weather_feat = np.zeros((window, 4), dtype=np.float32)
 
+    # Z-score normalize weather (use dataset-level rough stats)
     w_mean = weather_feat.mean(axis=0, keepdims=True)
     w_std = weather_feat.std(axis=0, keepdims=True) + 1e-5
     weather_feat = (weather_feat - w_mean) / w_std
 
+    # --- Holiday feature [W, 1] ---
     holiday_feat = np.zeros((window, 1), dtype=np.float32)
     for i, ts in enumerate(actual_ts):
         if ts.date() in holidays:
             holiday_feat[i] = 1.0
 
+    # --- Time features [W, 4] ---
     tod = ((actual_ts.hour * 60 + actual_ts.minute) // 5).values
     dow = actual_ts.dayofweek.values
     tod_sin = np.sin(2 * np.pi * tod / 288.0).reshape(-1, 1)
@@ -437,22 +385,24 @@ def build_input_tensor(traffic_df, weather_df, holidays, target_ts, scaler_mean,
     dow_cos = np.cos(2 * np.pi * dow / 7.0).reshape(-1, 1)
     time_feat = np.concatenate([tod_sin, tod_cos, dow_sin, dow_cos], axis=1).astype(np.float32)
 
-    traffic_3d = traffic_norm[:, :, None]
-    weather_3d = np.repeat(weather_feat[:, None, :], num_nodes, axis=1)
-    holiday_3d = np.repeat(holiday_feat[:, None, :], num_nodes, axis=1)
-    time_3d = np.repeat(time_feat[:, None, :], num_nodes, axis=1)
+    # Broadcast to [W, N, feat]
+    traffic_3d = traffic_norm[:, :, None]  # [W, N, 1]
+    weather_3d = np.repeat(weather_feat[:, None, :], num_nodes, axis=1)  # [W, N, 4]
+    holiday_3d = np.repeat(holiday_feat[:, None, :], num_nodes, axis=1)  # [W, N, 1]
+    time_3d = np.repeat(time_feat[:, None, :], num_nodes, axis=1)  # [W, N, 4]
 
+    # Concatenate: [W, N, 10] = 1 traffic + 4 weather + 1 holiday + 4 time
     X = np.concatenate([traffic_3d, weather_3d, holiday_3d, time_3d], axis=-1)
-    tensor = torch.FloatTensor(X).unsqueeze(0)
+    tensor = torch.FloatTensor(X).unsqueeze(0)  # [1, W, N, 10]
 
     return tensor, actual_ts, found_in_dataset
 
 
 def get_congestion_info(speed_mph):
-    """Classify congestion level from speed in mph."""
-    if speed_mph > 50:
+    """Classify congestion level from speed."""
+    if speed_mph > 37:
         return "Free Flow", "badge-green", "🟢"
-    elif speed_mph >= 30:
+    elif speed_mph >= 25:
         return "Moderate Traffic", "badge-yellow", "🟡"
     else:
         return "Heavy Congestion", "badge-red", "🔴"
@@ -461,7 +411,7 @@ def get_congestion_info(speed_mph):
 def get_weather_display(weather_df, target_ts):
     """Get weather info nearest to the target timestamp."""
     if weather_df is None or len(weather_df) == 0:
-        return {"temp": "N/A", "type": "Unknown", "icon": "❓", "wind": "N/A", "precip": "0.0 mm"}
+        return {"temp": "N/A", "type": "Unknown", "icon": "❓", "humidity": "N/A", "wind": "N/A", "precip": 0}
 
     weather_indexed = weather_df.set_index("time")
     idx = weather_indexed.index.searchsorted(target_ts)
@@ -473,6 +423,7 @@ def get_weather_display(weather_df, target_ts):
     visibility = row.get("visibility", 10000)
     wind = row.get("windspeed_10m", 0)
 
+    # Determine weather type
     if precip > 2.0:
         wtype, icon = "Rainy", "🌧️"
     elif precip > 0.1:
@@ -490,14 +441,11 @@ def get_weather_display(weather_df, target_ts):
     else:
         wtype, icon = "Cloudy", "☁️"
 
-    temp_f = temp_c * 9 / 5 + 32
-    wind_mph = wind * 0.621371
-
     return {
-        "temp": f"{temp_f:.1f}°F",
+        "temp": f"{temp_c:.1f}°C",
         "type": wtype,
         "icon": icon,
-        "wind": f"{wind_mph:.1f} mph",
+        "wind": f"{wind:.1f} mph",
         "precip": f"{precip:.1f} mm",
     }
 
@@ -506,17 +454,19 @@ def generate_ai_insights(pred_speed, congestion_label, horizon_label, actual_spe
     """Generate intelligent AI insights based on prediction results."""
     insights = []
 
+    # Trend analysis
     if trend_speeds is not None and len(trend_speeds) > 2:
         first_half = np.mean(trend_speeds[: len(trend_speeds) // 2])
         second_half = np.mean(trend_speeds[len(trend_speeds) // 2 :])
         diff = second_half - first_half
-        if diff > 3:
+        if diff > 2:
             insights.append("📈 Traffic speed is expected to **increase** over the prediction window, suggesting improving conditions.")
-        elif diff < -3:
+        elif diff < -2:
             insights.append("📉 Traffic speed is projected to **decrease**, indicating potential congestion build-up ahead.")
         else:
             insights.append("📊 Traffic conditions remain **stable** throughout the forecast horizon.")
 
+    # Congestion-based
     if congestion_label == "Heavy Congestion":
         insights.append("🚨 **Heavy congestion** detected near this sensor. Consider alternative routes or delayed departure.")
     elif congestion_label == "Moderate Traffic":
@@ -524,15 +474,17 @@ def generate_ai_insights(pred_speed, congestion_label, horizon_label, actual_spe
     else:
         insights.append("✅ **Free flow** conditions expected. Optimal time for travel through this corridor.")
 
+    # Comparison insight
     if actual_speed is not None:
         change = pred_speed - actual_speed
-        if abs(change) > 5:
+        if abs(change) > 3:
             direction = "increase" if change > 0 else "decrease"
             insights.append(f"🔮 Model predicts a **{abs(change):.1f} mph {direction}** compared to the actual recorded speed at this timestamp.")
 
+    # Horizon-based
     if "60" in horizon_label:
         insights.append("🕐 Long-range 60-minute forecast — predictions at this range have somewhat higher uncertainty.")
-    elif "5 " in horizon_label:
+    elif "5" in horizon_label:
         insights.append("⚡ Short-range 5-minute forecast — highest confidence prediction window.")
 
     return insights
@@ -545,11 +497,11 @@ traffic_df = load_traffic_data()
 model, device, scaler_mean, scaler_std = load_model()
 weather_df = load_weather_cache()
 holidays = load_holidays()
-base_profile = load_average_profile()
 
+# Dataset date range
 dataset_start = traffic_df.index[0].date()
 dataset_end = traffic_df.index[-1].date()
-sensor_ids = list(range(traffic_df.shape[1]))
+sensor_ids = list(range(traffic_df.shape[1]))  # 0 to 206
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Header
@@ -562,7 +514,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Sidebar — Shared Controls
+# Sidebar — Input Controls
 # ──────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
@@ -574,12 +526,35 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown("---")
 
+    sel_date = st.date_input(
+        "📅 Select Date",
+        value=datetime.date(2012, 4, 15),
+        min_value=dataset_start,
+        max_value=dataset_end,
+        help=f"METR-LA range: {dataset_start} to {dataset_end}",
+    )
+
+    sel_time = st.time_input(
+        "🕐 Select Time",
+        value=datetime.time(8, 45),
+        step=datetime.timedelta(minutes=5),
+        help="24-hour format, 5-minute intervals",
+    )
+
     sel_sensor = st.selectbox(
         "📡 Sensor ID",
         options=sensor_ids,
-        index=100,
+        index=91,
         help="METR-LA sensor index (0–206)",
     )
+
+    horizon_map = {"5 minutes": 0, "15 minutes": 2, "30 minutes": 5, "60 minutes": 11}
+    sel_horizon_label = st.selectbox(
+        "🎯 Prediction Horizon",
+        options=list(horizon_map.keys()),
+        index=1,
+    )
+    sel_horizon_idx = horizon_map[sel_horizon_label]
 
     st.markdown("---")
     st.markdown(f"""
@@ -591,123 +566,213 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Run prediction (auto-triggers on any input change)
+# ──────────────────────────────────────────────────────────────────────────────
+target_datetime = datetime.datetime.combine(sel_date, sel_time)
+target_ts = pd.Timestamp(target_datetime)
+
+# Build input and run model
+input_tensor, actual_timestamps, found_in_dataset = build_input_tensor(
+    traffic_df, weather_df, holidays, target_ts, scaler_mean, scaler_std
+)
+
+with torch.no_grad():
+    input_tensor_dev = input_tensor.to(device)
+    preds_raw = model(input_tensor_dev)  # [1, 12, 207]
+    preds_np = preds_raw.cpu().numpy()[0]  # [12, 207]
+
+# Inverse transform to mph then convert to mph
+preds_mph = preds_np * scaler_std + scaler_mean
+preds_mph_array = preds_mph  # kept as mph
+
+# Target sensor predicted speeds (all horizons)
+sensor_preds_mph_array = preds_mph_array[:, sel_sensor]  # [12]
+pred_speed = float(sensor_preds_mph_array[sel_horizon_idx])
+
+# Actual speed (if available)
+actual_speed = None
+if found_in_dataset:
+    # Get the actual speed at the target timestamp + horizon offset
+    horizon_offset = (sel_horizon_idx + 1) * 5  # minutes
+    future_ts = target_ts + pd.Timedelta(minutes=horizon_offset)
+    if future_ts in traffic_df.index:
+        actual_mph = float(traffic_df.loc[future_ts].iloc[sel_sensor])
+        actual_speed = actual_mph  # kept as mph
+
+# Also get actual historical speeds for the past window
+actual_history_mph = None
+if found_in_dataset:
+    history = traffic_df.iloc[
+        traffic_df.index.searchsorted(actual_timestamps[0]): traffic_df.index.searchsorted(actual_timestamps[-1]) + 1
+    ].iloc[:, sel_sensor].values # kept as mph
+    actual_history_mph = history
+
+# Congestion info
+congestion_label, congestion_badge, congestion_icon = get_congestion_info(pred_speed)
+
+# Weather info
+weather_info = get_weather_display(weather_df, target_ts)
+
+# Holiday check
+is_holiday = sel_date in holidays
+
+# AI insights
+insights = generate_ai_insights(
+    pred_speed, congestion_label, sel_horizon_label,
+    actual_speed=actual_speed, trend_speeds=sensor_preds_mph_array
+)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# TABS
+# LAYOUT — Main dashboard panels
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ── Row 1: Key Metrics ──
+st.markdown('<div class="section-header">📊 Prediction Results</div>', unsafe_allow_html=True)
+col1, col2, col3, col4 = st.columns(4)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 1: FUTURE FORECAST SIMULATOR (Live APIs)
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">🔮 Live Future Traffic Prediction</div>', unsafe_allow_html=True)
-st.markdown("""
-<div class="insight-card">
-    Pick any <strong>future date and time</strong> — the system will fetch live weather forecasts from
-    <strong>Open-Meteo API</strong> and check US holidays via <strong>Nager.Date API</strong> to generate a prediction.
-</div>
-""", unsafe_allow_html=True)
+with col1:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Predicted Speed</div>
+        <div class="metric-value">{pred_speed:.1f} <span style="font-size:0.9rem;color:#64748b;">mph</span></div>
+        <div class="metric-sub">@ {sel_horizon_label} horizon</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-fc1, fc2 = st.columns(2)
-today = datetime.datetime.now()
-default_sim_date = datetime.date(2012, 7, 1) if dataset_end < today.date() else today.date()
-target_d = fc1.date_input("📅 Target Date", value=default_sim_date, key="date_tab1")
-m = (today.minute // 5) * 5
-target_t = fc2.time_input("🕐 Target Time", value=datetime.time(today.hour, m), key="time_tab1")
+with col2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Prediction Time</div>
+        <div class="metric-value">{sel_time.strftime('%H:%M')}</div>
+        <div class="metric-sub">{sel_date.strftime('%B %d, %Y')}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-if st.button("⚡ Generate Future Forecast", type="primary", use_container_width=True):
-    target_datetime = datetime.datetime.combine(target_d, target_t)
-    target_ts = pd.Timestamp(target_datetime)
+with col3:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Sensor Station</div>
+        <div class="metric-value">#{sel_sensor}</div>
+        <div class="metric-sub">METR-LA network node</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with st.spinner("Fetching Live Weather & Running CADGT..."):
-        # Coordinates for LA (METR-LA dataset location)
-        lat, lon = 34.0522, -118.2437
-        future_weather = fetch_future_weather(lat, lon, target_datetime)
-        is_holiday = check_holiday_api(target_d)
-
-        # Build synthetic input from average traffic profile
-        history_times = [target_datetime - datetime.timedelta(minutes=5 * i) for i in range(11, -1, -1)]
-        custom_x = np.zeros((1, 12, 207, 10), dtype=np.float32)
-
-        for i, t_step in enumerate(history_times):
-            tod_idx = (t_step.hour * 60 + t_step.minute) // 5
-            dow_idx = t_step.weekday()
-
-            profiled_traffic_mph = base_profile[tod_idx, dow_idx, :]
-            custom_x[0, i, :, 0] = (profiled_traffic_mph - scaler_mean) / (scaler_std + 1e-5)
-
-            if future_weather is not None:
-                nearest = future_weather.iloc[(future_weather['time'] - t_step).abs().argsort()[:1]]
-                temp = nearest["temperature_2m"].values[0]
-                precip = nearest["precipitation"].values[0]
-                vis = nearest.get("visibility", pd.Series([10000.0])).values[0]
-                wind = nearest["windspeed_10m"].values[0]
-            else:
-                temp, precip, vis, wind = 20.0, 0.0, 10000.0, 5.0
-
-            # Simple z-score (profile-level)
-            custom_x[0, i, :, 1] = temp / 20.0
-            custom_x[0, i, :, 2] = precip / 5.0
-            custom_x[0, i, :, 3] = vis / 10000.0
-            custom_x[0, i, :, 4] = wind / 15.0
-
-            custom_x[0, i, :, 5] = float(is_holiday)
-
-            tod_norm = tod_idx / 288.0
-            dow_norm = dow_idx / 7.0
-            custom_x[0, i, :, 6] = np.sin(2 * np.pi * tod_norm)
-            custom_x[0, i, :, 7] = np.cos(2 * np.pi * tod_norm)
-            custom_x[0, i, :, 8] = np.sin(2 * np.pi * dow_norm)
-            custom_x[0, i, :, 9] = np.cos(2 * np.pi * dow_norm)
-
-        t_input = torch.FloatTensor(custom_x).to(device)
-        start_infer = time.time()
-        with torch.no_grad():
-            preds_future = model(t_input)
-        latency = (time.time() - start_infer) * 1000
-
-        p_future_np = preds_future.cpu().numpy()[0]
-        future_speeds_mph = p_future_np * scaler_std + scaler_mean
-
-    # Results
-    sensor_future = future_speeds_mph[:, sel_sensor]
-    
-    # We will show weather/time in a separate row, then the 4 horizons
-    h_str = "🎉 Holiday" if is_holiday else "📋 Regular Day"
-    target_display = target_datetime.strftime("%A, %b %d %Y at %I:%M %p")
-    temp_f = temp * 9 / 5 + 32
+with col4:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Congestion Level</div>
+        <div style="margin-top:8px;">
+            <span style="font-size:1.5rem;">{congestion_icon}</span>
+            <span class="badge {congestion_badge}" style="margin-left:6px;">{congestion_label}</span>
+        </div>
+        <div class="metric-sub">Based on predicted speed</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
-    # 4 Prediction Horizons
-    st.markdown('<div class="section-header">📊 All Prediction Horizons</div>', unsafe_allow_html=True)
-    h_cols = st.columns(4)
-    horizons_to_show = [(0, "5 min"), (2, "15 min"), (5, "30 min"), (11, "60 min")]
-    
-    for col, (h_idx, h_label) in zip(h_cols, horizons_to_show):
-        h_pred = float(sensor_future[h_idx])
-        h_cong_lbl, h_cong_bdg, h_cong_icn = get_congestion_info(h_pred)
-        with col:
-            st.markdown(f"""
-            <div class="metric-card" style="padding:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span class="metric-label" style="font-size:0.9rem; margin:0;">{h_label} Forecast</span>
-                    <span class="badge {h_cong_bdg}" style="font-size:0.65rem; padding:2px 8px;">{h_cong_lbl}</span>
-                </div>
-                <div class="metric-value" style="font-size:2rem; margin-top:12px;">{h_pred:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
+# ── Row 2: Chart + Traffic Change / AI Insights ──
+info_col = st.container()
+
+
+with info_col:
+    # Traffic Change Analysis
+    st.markdown('<div class="section-header">🔄 Traffic Change Analysis</div>', unsafe_allow_html=True)
+
+    if actual_speed is not None:
+        change = pred_speed - actual_speed
+        if change > 0:
+            change_html = f'<span class="change-up">Increase (+{change:.1f} mph) ↑</span>'
+        elif change < 0:
+            change_html = f'<span class="change-down">Decrease ({change:.1f} mph) ↓</span>'
+        else:
+            change_html = '<span class="change-neutral">No Change (0.0 mph) →</span>'
+
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Actual Speed</div>
+            <div class="metric-value" style="font-size:1.4rem;">{actual_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Predicted Speed</div>
+            <div class="metric-value" style="font-size:1.4rem;">{pred_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Traffic Change</div>
+            <div style="margin-top:6px;">{change_html}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Predicted Speed</div>
+            <div class="metric-value" style="font-size:1.4rem;">{pred_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
+            <div class="metric-sub" style="margin-top:8px;color:#f59e0b;">
+                ⚠️ Actual data not available for this timestamp.
             </div>
-            """, unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
     # AI Insights
     st.markdown('<div class="section-header">🤖 AI Traffic Insights</div>', unsafe_allow_html=True)
-    # Generate overall insights based on the 60-min horizon
-    future_pred_overall = float(sensor_future[11])
-    cong_lbl_overall, _, _ = get_congestion_info(future_pred_overall)
-    future_insights = generate_ai_insights(future_pred_overall, cong_lbl_overall, "60 minutes", trend_speeds=sensor_future)
-    for insight in future_insights:
+    for insight in insights:
         st.markdown(f'<div class="insight-card">{insight}</div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Row 3: Weather & Holiday ──
+st.markdown('<div class="section-header">🌍 Context Information</div>', unsafe_allow_html=True)
+w1, w2, w3, w4, w5 = st.columns(5)
+
+with w1:
+    st.markdown(f"""
+    <div class="weather-card">
+        <div class="weather-icon">{weather_info['icon']}</div>
+        <div class="weather-temp">{weather_info['temp']}</div>
+        <div class="weather-label">Temperature</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with w2:
+    st.markdown(f"""
+    <div class="weather-card">
+        <div class="weather-icon">🌤️</div>
+        <div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['type']}</div>
+        <div class="weather-label">Weather Type</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with w3:
+    st.markdown(f"""
+    <div class="weather-card">
+        <div class="weather-icon">💧</div>
+        <div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['precip']}</div>
+        <div class="weather-label">Precipitation</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with w4:
+    st.markdown(f"""
+    <div class="weather-card">
+        <div class="weather-icon">💨</div>
+        <div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['wind']}</div>
+        <div class="weather-label">Wind Speed</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with w5:
+    if is_holiday:
+        pill = '<span class="holiday-pill holiday-yes">🎉 Holiday</span>'
+    else:
+        pill = '<span class="holiday-pill holiday-no">📋 Regular Day</span>'
+    st.markdown(f"""
+    <div class="weather-card">
+        <div class="weather-icon">📅</div>
+        <div style="margin-top:8px;">{pill}</div>
+        <div class="weather-label" style="margin-top:6px;">Holiday Status</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 # ── Footer ──
 st.markdown("""
 <div style="text-align:center; padding:30px 0 10px 0; color:#475569; font-size:0.72rem; letter-spacing:0.04em;">
