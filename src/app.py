@@ -259,30 +259,42 @@ total_steps = len(stream_x)
 st.markdown('<div class="main-title">🚦 METR-LA Traffic Speed Forecasting</div>', unsafe_allow_html=True)
 st.markdown('<div class="main-subtitle">Powered by the Context-Aware Dynamic Graph Transformer (CADGT)</div>', unsafe_allow_html=True)
 
-# ======================= SIDEBAR =======================
-st.sidebar.header("Controls")
 
-sensor_id = st.sidebar.selectbox(
-    f"Select Sensor (all {dataset_info['num_nodes']})",
-    options=range(dataset_info['num_nodes']),
-    index=50
-)
-
-st.sidebar.markdown("---")
 
 # ======================= TABS =======================
 tab1, tab2 = st.tabs(["📊 Sensor Prediction View", "🔮 Future Forecast Simulator"])
 
 # ==================== TAB 1: REPLAY ====================
 with tab1:
-    step_index = st.sidebar.slider(
-        "Select Date & Time",
-        min_value=0,
-        max_value=total_steps - 1,
-        value=0,
-        step=1,
-        help="Scroll through the METR-LA test set (each step = 5 minutes)."
+    # --- Inline Controls ---
+    test_start_dt = datetime.datetime(2012, 6, 4, 5, 45)
+
+    ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([2, 2, 2, 2])
+    sensor_id = ctrl1.selectbox(
+        f"Select Sensor (all {dataset_info['num_nodes']})",
+        options=range(dataset_info['num_nodes']),
+        index=50,
+        key="sensor_tab1"
     )
+    selected_date = ctrl2.date_input(
+        "Date",
+        value=datetime.date(2012, 6, 4),
+        min_value=datetime.date(2012, 6, 4),
+        max_value=datetime.date(2012, 6, 27)
+    )
+    selected_time = ctrl3.time_input(
+        "Time",
+        value=datetime.time(8, 0),
+        step=datetime.timedelta(minutes=5)
+    )
+    horizon_options = {"15 min": 2, "30 min": 5, "45 min": 8, "60 min": 11}
+    horizon_label = ctrl4.selectbox("Prediction Horizon", options=list(horizon_options.keys()), index=3, key="horizon_tab1")
+    horizon_idx = horizon_options[horizon_label]
+
+    # Convert selected date+time to a step index
+    selected_dt = datetime.datetime.combine(selected_date, selected_time)
+    step_index = int((selected_dt - test_start_dt).total_seconds() // 300)
+    step_index = max(0, min(step_index, total_steps - 1))
 
     # --- Inference ---
     live_x = stream_x[step_index:step_index + 1]
@@ -301,9 +313,9 @@ with tab1:
     true_scaled = true_y[0]
     true_speeds = pip_scaler.inverse_transform(true_scaled)
 
-    # Pick the 60-minute (last horizon step) prediction
-    predicted_speed = pred_speeds[-1, sensor_id]
-    actual_speed = true_speeds[-1, sensor_id]
+    # Pick the selected horizon prediction
+    predicted_speed = pred_speeds[horizon_idx, sensor_id]
+    actual_speed = true_speeds[horizon_idx, sensor_id]
     delta = predicted_speed - actual_speed
 
     # Delta display
@@ -326,12 +338,12 @@ with tab1:
         <div class="pred-card-title">Prediction — Sensor {sensor_id}</div>
         <div class="speed-container">
             <div class="speed-block">
-                <div class="speed-label">Predicted Speed (60 min)</div>
+                <div class="speed-label">Predicted Speed ({horizon_label})</div>
                 <div class="speed-value">{predicted_speed:.1f} <span class="speed-unit">mph</span></div>
                 <div class="speed-delta {delta_class}">{delta_sign}{delta:.1f} vs actual</div>
             </div>
             <div class="speed-block">
-                <div class="speed-label">Actual Speed (60 min)</div>
+                <div class="speed-label">Actual Speed ({horizon_label})</div>
                 <div class="speed-value">{actual_speed:.1f} <span class="speed-unit">mph</span></div>
             </div>
             <div class="status-block">
@@ -401,11 +413,20 @@ with tab2:
     fetch the live weather forecast from Open-Meteo and check for US holidays.
     """)
 
-    col1, col2 = st.columns(2)
+    fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 2])
+    sensor_id_future = fc1.selectbox(
+        f"Select Sensor (all {dataset_info['num_nodes']})",
+        options=range(dataset_info['num_nodes']),
+        index=50,
+        key="sensor_tab2"
+    )
     today = datetime.datetime.now()
-    target_d = col1.date_input("Date", value=today.date())
+    target_d = fc2.date_input("Date", value=today.date(), key="date_tab2")
     m = (today.minute // 5) * 5
-    target_t = col2.time_input("Select Date & Time", value=datetime.time(today.hour, m))
+    target_t = fc3.time_input("Time", value=datetime.time(today.hour, m), key="time_tab2")
+    horizon_options_f = {"15 min": 2, "30 min": 5, "45 min": 8, "60 min": 11}
+    horizon_label_f = fc4.selectbox("Prediction Horizon", options=list(horizon_options_f.keys()), index=3, key="horizon_tab2")
+    horizon_idx_f = horizon_options_f[horizon_label_f]
 
     if st.button("Generate Future Forecast", type="primary"):
         target_datetime = datetime.datetime.combine(target_d, target_t)
@@ -460,9 +481,9 @@ with tab2:
             p_future_np = preds_future.cpu().numpy()[0]
             future_speeds = pip_scaler.inverse_transform(p_future_np)
 
-        # Pick 60-min prediction for main card
-        future_pred_60 = future_speeds[-1, sensor_id]
-        dot_cls, txt_cls, stat_lbl = get_traffic_status(future_pred_60)
+        # Pick selected horizon prediction for main card
+        future_pred_h = future_speeds[horizon_idx_f, sensor_id_future]
+        dot_cls, txt_cls, stat_lbl = get_traffic_status(future_pred_h)
         h_str = "Yes" if is_holiday else "No"
         target_display = target_datetime.strftime("%A, %b %d %Y at %I:%M %p")
 
@@ -471,12 +492,12 @@ with tab2:
         # Future Prediction Card
         st.markdown(f"""
         <div class="pred-card">
-            <div class="pred-card-title">Future Prediction — Sensor {sensor_id}</div>
+            <div class="pred-card-title">Future Prediction — Sensor {sensor_id_future}</div>
             <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">{target_display}</div>
             <div class="speed-container">
                 <div class="speed-block">
-                    <div class="speed-label">Predicted Speed (60 min)</div>
-                    <div class="speed-value">{future_pred_60:.1f} <span class="speed-unit">mph</span></div>
+                    <div class="speed-label">Predicted Speed ({horizon_label_f})</div>
+                    <div class="speed-value">{future_pred_h:.1f} <span class="speed-unit">mph</span></div>
                 </div>
                 <div class="speed-block">
                     <div class="speed-label">Weather</div>
@@ -494,10 +515,10 @@ with tab2:
 
         # Future Chart
         st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.subheader(f"Future Speed Timeline — Sensor {sensor_id}")
+        st.subheader(f"Future Speed Timeline — Sensor {sensor_id_future}")
 
         f_times = [target_datetime + datetime.timedelta(minutes=5 * (i + 1)) for i in range(12)]
-        sensor_f_pred = future_speeds[:, sensor_id]
+        sensor_f_pred = future_speeds[:, sensor_id_future]
 
         fig2 = go.Figure()
         fig2.add_trace(go.Scatter(
