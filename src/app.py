@@ -1,168 +1,345 @@
+"""
+Traffic Flow Forecasting & Congestion Behaviour Analysis Dashboard
+AI-powered traffic prediction using CADGT (Context-Aware Dynamic Graph Transformer)
+Merged: Teammate's premium dark theme + Live API future forecasting
+"""
+
 import os
 import sys
+import json
 import time
+import pickle
 import datetime
-import torch
 import numpy as np
-import yaml
 import pandas as pd
+import torch
 import streamlit as st
 import plotly.graph_objects as go
 import requests
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# ---------------------------------------------------------------------------
+# Ensure project root is on sys.path so model imports work
+# ---------------------------------------------------------------------------
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-from src.data_loader import load_traffic, StandardScaler, load_static_adj
-from src.utils import set_seed
 from models.cadgt import CADGT
 
-# --- Configure Streamlit Page ---
+# ──────────────────────────────────────────────────────────────────────────────
+# Page configuration
+# ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="METR-LA Traffic Speed Forecasting",
+    page_title="Traffic Flow Forecasting System",
     page_icon="🚦",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# --- Custom CSS for Clean Card-Based Design ---
+# ──────────────────────────────────────────────────────────────────────────────
+# Custom CSS — premium smart-city theme
+# ──────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Main title */
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 700;
-        color: #1a1a2e;
-        margin-bottom: 0.2rem;
-    }
-    .main-subtitle {
-        font-size: 1rem;
-        color: #666;
-        margin-bottom: 1.5rem;
-    }
+/* ── Import Google Font ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-    /* Prediction Card */
-    .pred-card {
-        background: linear-gradient(135deg, #f0f4ff 0%, #e8edf5 100%);
-        border-radius: 16px;
-        padding: 2rem;
-        margin: 1rem 0;
-        border: 1px solid #dde3ed;
-    }
-    .pred-card-title {
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: #1a1a2e;
-        margin-bottom: 1.2rem;
-    }
+/* ── Root variables ── */
+:root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-card: rgba(17, 24, 39, 0.85);
+    --border-card: rgba(99, 102, 241, 0.25);
+    --accent-indigo: #6366f1;
+    --accent-cyan: #22d3ee;
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --glass: rgba(255,255,255,0.04);
+}
 
-    /* Speed Display */
-    .speed-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1.5rem;
-    }
-    .speed-block {
-        flex: 1;
-        min-width: 150px;
-    }
-    .speed-label {
-        font-size: 0.85rem;
-        color: #888;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.3rem;
-    }
-    .speed-value {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #1a1a2e;
-        line-height: 1.1;
-    }
-    .speed-unit {
-        font-size: 1rem;
-        color: #888;
-        font-weight: 400;
-    }
-    .speed-delta {
-        font-size: 0.9rem;
-        margin-top: 0.3rem;
-    }
-    .delta-positive { color: #e74c3c; }
-    .delta-negative { color: #27ae60; }
-    .delta-neutral  { color: #888; }
+/* ── Global ── */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+}
+.stApp {
+    background: linear-gradient(135deg, #0a0e17 0%, #1a1a2e 40%, #16213e 100%);
+}
 
-    /* Status Badge */
-    .status-block {
-        text-align: center;
-        min-width: 120px;
-    }
-    .status-dot {
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        display: inline-block;
-        margin-bottom: 0.4rem;
-    }
-    .status-dot-green  { background-color: #2ecc71; box-shadow: 0 0 8px rgba(46,204,113,0.5); }
-    .status-dot-yellow { background-color: #f1c40f; box-shadow: 0 0 8px rgba(241,196,15,0.5); }
-    .status-dot-orange { background-color: #e67e22; box-shadow: 0 0 8px rgba(230,126,34,0.5); }
-    .status-dot-red    { background-color: #e74c3c; box-shadow: 0 0 8px rgba(231,76,60,0.5); }
-    .status-label {
-        font-size: 0.85rem;
-        color: #888;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .status-text {
-        font-size: 1.1rem;
-        font-weight: 700;
-        margin-top: 0.2rem;
-    }
-    .status-free    { color: #2ecc71; }
-    .status-slow    { color: #f1c40f; }
-    .status-heavy   { color: #e67e22; }
-    .status-stopped { color: #e74c3c; }
+/* ── Sidebar ── */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #111827 0%, #0f172a 100%) !important;
+    border-right: 1px solid rgba(99,102,241,0.2);
+}
+section[data-testid="stSidebar"] .stSelectbox label,
+section[data-testid="stSidebar"] .stDateInput label,
+section[data-testid="stSidebar"] .stTimeInput label,
+section[data-testid="stSidebar"] .stNumberInput label {
+    color: #cbd5e1 !important;
+    font-weight: 500 !important;
+    font-size: 0.85rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
 
-    /* Chart card */
-    .chart-card {
-        background: #fff;
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        border: 1px solid #eee;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    }
+/* ── Metric cards ── */
+.metric-card {
+    background: linear-gradient(135deg, rgba(17,24,39,0.9) 0%, rgba(30,41,59,0.8) 100%);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 16px;
+    padding: 24px 28px;
+    backdrop-filter: blur(12px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 12px;
+}
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(99,102,241,0.18);
+}
+.metric-label {
+    color: #94a3b8;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+.metric-value {
+    color: #f1f5f9;
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.metric-sub {
+    color: #64748b;
+    font-size: 0.75rem;
+    margin-top: 4px;
+}
 
-    /* Force light background */
-    .stApp {
-        background-color: #f7f9fc;
-    }
-    section[data-testid="stSidebar"] {
-        background-color: #ffffff;
-    }
+/* ── Congestion badges ── */
+.badge {
+    display: inline-block;
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+}
+.badge-green {
+    background: rgba(16,185,129,0.15);
+    color: #34d399;
+    border: 1px solid rgba(16,185,129,0.35);
+}
+.badge-yellow {
+    background: rgba(245,158,11,0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.35);
+}
+.badge-red {
+    background: rgba(244,63,94,0.15);
+    color: #fb7185;
+    border: 1px solid rgba(244,63,94,0.35);
+}
+
+/* ── Header ── */
+.dashboard-header {
+    background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(34,211,238,0.08) 100%);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 20px;
+    padding: 32px 40px;
+    margin-bottom: 24px;
+    text-align: center;
+    backdrop-filter: blur(16px);
+}
+.dashboard-header h1 {
+    background: linear-gradient(135deg, #818cf8, #22d3ee);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 2.1rem;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+.dashboard-header p {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    margin-top: 6px;
+    font-weight: 400;
+}
+
+/* ── Section header ── */
+.section-header {
+    color: #cbd5e1;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    margin: 20px 0 10px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(99,102,241,0.15);
+}
+
+/* ── AI insight card ── */
+.insight-card {
+    background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(34,211,238,0.06) 100%);
+    border-left: 3px solid #6366f1;
+    border-radius: 0 12px 12px 0;
+    padding: 14px 18px;
+    margin: 8px 0;
+    color: #cbd5e1;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+/* ── Weather card ── */
+.weather-card {
+    background: linear-gradient(135deg, rgba(34,211,238,0.08) 0%, rgba(16,185,129,0.05) 100%);
+    border: 1px solid rgba(34,211,238,0.2);
+    border-radius: 16px;
+    padding: 20px 24px;
+    text-align: center;
+}
+.weather-icon { font-size: 2.2rem; margin-bottom: 4px; }
+.weather-temp { font-size: 1.6rem; font-weight: 700; color: #f1f5f9; }
+.weather-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+
+/* ── Holiday pill ── */
+.holiday-pill {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 24px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.holiday-yes {
+    background: rgba(245,158,11,0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.3);
+}
+.holiday-no {
+    background: rgba(16,185,129,0.12);
+    color: #6ee7b7;
+    border: 1px solid rgba(16,185,129,0.25);
+}
+
+/* ── Animated pulse for live indicator ── */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+.live-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    animation: pulse 2s infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* ── Change indicator arrows ── */
+.change-up { color: #f43f5e; font-weight: 700; }
+.change-down { color: #10b981; font-weight: 700; }
+.change-neutral { color: #94a3b8; font-weight: 600; }
+
+/* ── Hide default Streamlit branding ── */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+/* ── Plotly container rounding ── */
+.stPlotlyChart {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(99,102,241,0.15);
+}
 </style>
 """, unsafe_allow_html=True)
 
 
-# --- Helper: Traffic Status ---
-def get_traffic_status(speed_mph):
-    """Returns (dot_class, text_class, label) based on speed thresholds for LA freeways."""
-    if speed_mph >= 50:
-        return "status-dot-green", "status-free", "FREE FLOW"
-    elif speed_mph >= 30:
-        return "status-dot-yellow", "status-slow", "SLOW"
-    elif speed_mph >= 15:
-        return "status-dot-orange", "status-heavy", "HEAVY"
-    else:
-        return "status-dot-red", "status-stopped", "CONGESTED"
+# ──────────────────────────────────────────────────────────────────────────────
+# Cached data loading helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+@st.cache_resource(show_spinner="Loading METR-LA traffic dataset…")
+def load_traffic_data():
+    """Load the METR-LA HDF5 dataset and return DataFrame + raw array."""
+    h5_path = os.path.join(PROJECT_ROOT, "data", "METR-LA.h5")
+    df = pd.read_hdf(h5_path)
+    df_clean = df.replace(0, np.nan).ffill().bfill()
+    return df_clean
 
 
-# --- APIs for Future Forecasting ---
+@st.cache_resource(show_spinner="Loading CADGT model…")
+def load_model():
+    """Load the trained CADGT model + scaler from checkpoint."""
+    adj_path = os.path.join(PROJECT_ROOT, "data", "adj_METR-LA.pkl")
+    with open(adj_path, "rb") as f:
+        _, _, adj_mx = pickle.load(f, encoding="latin1")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    ckpt_path = os.path.join(PROJECT_ROOT, "saved_models", "cadgt_best.pth")
+    checkpoint = torch.load(ckpt_path, map_location=device)
+
+    model = CADGT(
+        num_nodes=207, seq_len=12, future_len=12,
+        ctx_dim=9, d_model=64, static_adj=adj_mx,
+    ).to(device)
+    model.load_state_dict(checkpoint["model"])
+    model.eval()
+
+    scaler_mean = checkpoint["scaler_mean"]
+    scaler_std = checkpoint["scaler_std"]
+
+    return model, device, scaler_mean, scaler_std
+
+
+@st.cache_data(show_spinner="Loading weather data…")
+def load_weather_cache():
+    """Load the largest weather cache CSV."""
+    data_dir = os.path.join(PROJECT_ROOT, "data")
+    candidates = [f for f in os.listdir(data_dir) if f.startswith("weather_cache_") and f.endswith(".csv")]
+    if not candidates:
+        return None
+    largest = max(candidates, key=lambda f: os.path.getsize(os.path.join(data_dir, f)))
+    df = pd.read_csv(os.path.join(data_dir, largest), parse_dates=["time"])
+    return df
+
+
+@st.cache_data(show_spinner="Loading holiday data…")
+def load_holidays():
+    """Load holidays from the JSON cache."""
+    cache_path = os.path.join(PROJECT_ROOT, "data", "holidays_cache.json")
+    if not os.path.exists(cache_path):
+        return set()
+    with open(cache_path, "r") as f:
+        data = json.load(f)
+    all_dates = set()
+    for year_key, dates in data.items():
+        for d in dates:
+            all_dates.add(pd.to_datetime(d).date())
+    return all_dates
+
+
+@st.cache_data(show_spinner=False)
+def load_average_profile():
+    """Load pre-computed average traffic profile for future forecasting."""
+    path = os.path.join(PROJECT_ROOT, "data", "computed", "average_traffic_profile.npy")
+    if os.path.exists(path):
+        return np.load(path)
+    return np.zeros((288, 7, 207))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Live API helpers (for Future Forecast tab)
+# ──────────────────────────────────────────────────────────────────────────────
+
 @st.cache_data(ttl=3600)
 def fetch_future_weather(lat, lon, target_date):
-    """Fetches hourly weather forecast for a future date using Open-Meteo."""
+    """Fetches hourly weather forecast from Open-Meteo for a future date."""
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat, "longitude": lon,
@@ -184,286 +361,293 @@ def fetch_future_weather(lat, lon, target_date):
         st.error(f"Failed to fetch live weather forecast: {e}")
         return None
 
+
 @st.cache_data(ttl=86400)
-def check_holiday(target_date):
-    """Checks if the given date is a US holiday."""
+def check_holiday_api(target_date):
+    """Checks if the given date is a US holiday via Nager.Date API."""
     year = target_date.year
     url = f"https://date.nager.at/api/v3/PublicHolidays/{year}/US"
     try:
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             holidays = [datetime.datetime.strptime(h['date'], "%Y-%m-%d").date() for h in response.json()]
-            return target_date.date() in holidays
+            return target_date in holidays
     except:
         pass
     return False
 
 
-# --- Caching Data & Model Loading ---
-@st.cache_resource
-def load_forecast_environment():
-    """Loads config, test datasets, scaler, and the trained CADGT model."""
-    config_path = "src/config.yaml"
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+# ──────────────────────────────────────────────────────────────────────────────
+# Feature engineering helpers
+# ──────────────────────────────────────────────────────────────────────────────
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def build_input_tensor(traffic_df, weather_df, holidays, target_ts, scaler_mean, scaler_std, num_nodes=207, window=12):
+    """Build the [1, 12, 207, 10] input tensor for CADGT from raw data."""
+    timestamps = traffic_df.index
+    idx = timestamps.searchsorted(target_ts)
+    idx = min(idx, len(timestamps) - 1)
 
-    from src.data_loader import get_dataloaders
-    _, _, test_loader, pip_scaler, dataset_info = get_dataloaders(config)
+    start = max(0, idx - window + 1)
+    end = idx + 1
+    if end - start < window:
+        start = 0
+        end = window
 
-    adj_static = load_static_adj(config['data']['adj_path'])
+    actual_ts = timestamps[start:end]
+    traffic_slice = traffic_df.iloc[start:end].values.astype(np.float32)
 
-    hidden_dim = config.get('model_defaults', {}).get('hidden_dim', 64)
-    cadgt_overrides = config.get('model_overrides', {}).get('CADGT', {})
+    found_in_dataset = abs((timestamps[idx] - target_ts).total_seconds()) < 600
 
-    model = CADGT(
-        num_nodes=dataset_info['num_nodes'],
-        seq_len=config['training']['window'],
-        future_len=config['training']['horizon'],
-        ctx_dim=dataset_info['num_features'] - 1,
-        d_model=cadgt_overrides.get('hidden_dim', hidden_dim),
-        static_adj=adj_static
-    ).to(device)
+    traffic_norm = (traffic_slice - scaler_mean) / (scaler_std + 1e-5)
 
-    ckpt_path = os.path.join("saved_models", "cadgt_best.pth")
-    checkpoint = torch.load(ckpt_path, map_location=device)
-    model.load_state_dict(checkpoint['model'])
-    model.eval()
-
-    stream_x, stream_y = [], []
-    for x, y in test_loader:
-        stream_x.append(x.numpy())
-        stream_y.append(y.numpy())
-
-    stream_x = np.concatenate(stream_x, axis=0)
-    stream_y = np.concatenate(stream_y, axis=0)
-
-    base_profile_path = "data/computed/average_traffic_profile.npy"
-    base_profile = np.load(base_profile_path) if os.path.exists(base_profile_path) else np.zeros((288, 7, 207))
-
-    weather_test = stream_x[:, :, :, 1:5]
-    w_mean = np.mean(weather_test, axis=(0, 1, 2))
-    w_std = np.std(weather_test, axis=(0, 1, 2)) + 1e-5
-
-    return model, stream_x, stream_y, pip_scaler, dataset_info, device, config, base_profile, (w_mean, w_std)
-
-
-# --- Load resources ---
-with st.spinner("Loading Model and Data..."):
-    model, stream_x, stream_y, pip_scaler, dataset_info, device, config, base_profile, weather_stats = load_forecast_environment()
-
-total_steps = len(stream_x)
-
-# ======================= HEADER =======================
-st.markdown('<div class="main-title">🚦 METR-LA Traffic Speed Forecasting</div>', unsafe_allow_html=True)
-st.markdown('<div class="main-subtitle">Powered by the Context-Aware Dynamic Graph Transformer (CADGT)</div>', unsafe_allow_html=True)
-
-
-
-# ======================= TABS =======================
-tab1, tab2 = st.tabs(["📊 Sensor Prediction View", "🔮 Future Forecast Simulator"])
-
-# ==================== TAB 1: REPLAY ====================
-with tab1:
-    # --- Inline Controls ---
-    test_start_dt = datetime.datetime(2012, 6, 4, 5, 45)
-
-    ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([2, 2, 2, 2])
-    sensor_id = ctrl1.selectbox(
-        f"Select Sensor (all {dataset_info['num_nodes']})",
-        options=range(dataset_info['num_nodes']),
-        index=50,
-        key="sensor_tab1"
-    )
-    selected_date = ctrl2.date_input(
-        "Date",
-        value=datetime.date(2012, 6, 4),
-        min_value=datetime.date(2012, 6, 4),
-        max_value=datetime.date(2012, 6, 27)
-    )
-    selected_time = ctrl3.time_input(
-        "Time",
-        value=datetime.time(8, 0),
-        step=datetime.timedelta(minutes=5)
-    )
-    horizon_options = {"15 min": 2, "30 min": 5, "45 min": 8, "60 min": 11}
-    horizon_label = ctrl4.selectbox("Prediction Horizon", options=list(horizon_options.keys()), index=3, key="horizon_tab1")
-    horizon_idx = horizon_options[horizon_label]
-
-    # Convert selected date+time to a step index
-    selected_dt = datetime.datetime.combine(selected_date, selected_time)
-    step_index = int((selected_dt - test_start_dt).total_seconds() // 300)
-    step_index = max(0, min(step_index, total_steps - 1))
-
-    # --- Inference ---
-    live_x = stream_x[step_index:step_index + 1]
-    true_y = stream_y[step_index:step_index + 1]
-
-    x_tensor = torch.FloatTensor(live_x).to(device)
-    start_time = time.time()
-    with torch.no_grad():
-        preds = model(x_tensor)
-    inference_time_ms = (time.time() - start_time) * 1000
-
-    p_np = preds.cpu().numpy()[0]
-    pred_speeds = pip_scaler.inverse_transform(p_np)
-    past_scaled = live_x[0, :, :, 0]
-    past_speeds = pip_scaler.inverse_transform(past_scaled)
-    true_scaled = true_y[0]
-    true_speeds = pip_scaler.inverse_transform(true_scaled)
-
-    # Pick the selected horizon prediction
-    predicted_speed = pred_speeds[horizon_idx, sensor_id]
-    actual_speed = true_speeds[horizon_idx, sensor_id]
-    delta = predicted_speed - actual_speed
-
-    # Delta display
-    if abs(delta) < 0.5:
-        delta_class = "delta-neutral"
-        delta_sign = ""
-    elif delta > 0:
-        delta_class = "delta-positive"
-        delta_sign = "+"
+    if weather_df is not None and len(weather_df) > 0:
+        weather_indexed = weather_df.set_index("time")
+        weather_aligned = weather_indexed.reindex(actual_ts, method="nearest")
+        weather_feat = weather_aligned[["temperature_2m", "precipitation", "visibility", "windspeed_10m"]].values.astype(np.float32)
+        weather_feat = np.nan_to_num(weather_feat, nan=0.0)
     else:
-        delta_class = "delta-negative"
-        delta_sign = ""
+        weather_feat = np.zeros((window, 4), dtype=np.float32)
 
-    # Traffic status
-    dot_class, text_class, status_label = get_traffic_status(predicted_speed)
+    w_mean = weather_feat.mean(axis=0, keepdims=True)
+    w_std = weather_feat.std(axis=0, keepdims=True) + 1e-5
+    weather_feat = (weather_feat - w_mean) / w_std
 
-    # --- PREDICTION CARD ---
+    holiday_feat = np.zeros((window, 1), dtype=np.float32)
+    for i, ts in enumerate(actual_ts):
+        if ts.date() in holidays:
+            holiday_feat[i] = 1.0
+
+    tod = ((actual_ts.hour * 60 + actual_ts.minute) // 5).values
+    dow = actual_ts.dayofweek.values
+    tod_sin = np.sin(2 * np.pi * tod / 288.0).reshape(-1, 1)
+    tod_cos = np.cos(2 * np.pi * tod / 288.0).reshape(-1, 1)
+    dow_sin = np.sin(2 * np.pi * dow / 7.0).reshape(-1, 1)
+    dow_cos = np.cos(2 * np.pi * dow / 7.0).reshape(-1, 1)
+    time_feat = np.concatenate([tod_sin, tod_cos, dow_sin, dow_cos], axis=1).astype(np.float32)
+
+    traffic_3d = traffic_norm[:, :, None]
+    weather_3d = np.repeat(weather_feat[:, None, :], num_nodes, axis=1)
+    holiday_3d = np.repeat(holiday_feat[:, None, :], num_nodes, axis=1)
+    time_3d = np.repeat(time_feat[:, None, :], num_nodes, axis=1)
+
+    X = np.concatenate([traffic_3d, weather_3d, holiday_3d, time_3d], axis=-1)
+    tensor = torch.FloatTensor(X).unsqueeze(0)
+
+    return tensor, actual_ts, found_in_dataset
+
+
+def get_congestion_info(speed_mph):
+    """Classify congestion level from speed in mph."""
+    if speed_mph > 50:
+        return "Free Flow", "badge-green", "🟢"
+    elif speed_mph >= 30:
+        return "Moderate Traffic", "badge-yellow", "🟡"
+    else:
+        return "Heavy Congestion", "badge-red", "🔴"
+
+
+def get_weather_display(weather_df, target_ts):
+    """Get weather info nearest to the target timestamp."""
+    if weather_df is None or len(weather_df) == 0:
+        return {"temp": "N/A", "type": "Unknown", "icon": "❓", "wind": "N/A", "precip": "0.0 mm"}
+
+    weather_indexed = weather_df.set_index("time")
+    idx = weather_indexed.index.searchsorted(target_ts)
+    idx = min(idx, len(weather_indexed) - 1)
+    row = weather_indexed.iloc[idx]
+
+    temp_c = row.get("temperature_2m", 0)
+    precip = row.get("precipitation", 0)
+    visibility = row.get("visibility", 10000)
+    wind = row.get("windspeed_10m", 0)
+
+    if precip > 2.0:
+        wtype, icon = "Rainy", "🌧️"
+    elif precip > 0.1:
+        wtype, icon = "Light Rain", "🌦️"
+    elif visibility < 2000:
+        wtype, icon = "Foggy", "🌫️"
+    elif wind > 30:
+        wtype, icon = "Windy", "💨"
+    elif temp_c > 30:
+        wtype, icon = "Hot & Sunny", "☀️"
+    elif temp_c > 20:
+        wtype, icon = "Sunny", "🌤️"
+    elif temp_c > 10:
+        wtype, icon = "Partly Cloudy", "⛅"
+    else:
+        wtype, icon = "Cloudy", "☁️"
+
+    temp_f = temp_c * 9 / 5 + 32
+    wind_mph = wind * 0.621371
+
+    return {
+        "temp": f"{temp_f:.1f}°F",
+        "type": wtype,
+        "icon": icon,
+        "wind": f"{wind_mph:.1f} mph",
+        "precip": f"{precip:.1f} mm",
+    }
+
+
+def generate_ai_insights(pred_speed, congestion_label, horizon_label, actual_speed=None, trend_speeds=None):
+    """Generate intelligent AI insights based on prediction results."""
+    insights = []
+
+    if trend_speeds is not None and len(trend_speeds) > 2:
+        first_half = np.mean(trend_speeds[: len(trend_speeds) // 2])
+        second_half = np.mean(trend_speeds[len(trend_speeds) // 2 :])
+        diff = second_half - first_half
+        if diff > 3:
+            insights.append("📈 Traffic speed is expected to **increase** over the prediction window, suggesting improving conditions.")
+        elif diff < -3:
+            insights.append("📉 Traffic speed is projected to **decrease**, indicating potential congestion build-up ahead.")
+        else:
+            insights.append("📊 Traffic conditions remain **stable** throughout the forecast horizon.")
+
+    if congestion_label == "Heavy Congestion":
+        insights.append("🚨 **Heavy congestion** detected near this sensor. Consider alternative routes or delayed departure.")
+    elif congestion_label == "Moderate Traffic":
+        insights.append("⚠️ **Moderate congestion** likely near this sensor. Allow extra travel time for safety.")
+    else:
+        insights.append("✅ **Free flow** conditions expected. Optimal time for travel through this corridor.")
+
+    if actual_speed is not None:
+        change = pred_speed - actual_speed
+        if abs(change) > 5:
+            direction = "increase" if change > 0 else "decrease"
+            insights.append(f"🔮 Model predicts a **{abs(change):.1f} mph {direction}** compared to the actual recorded speed at this timestamp.")
+
+    if "60" in horizon_label:
+        insights.append("🕐 Long-range 60-minute forecast — predictions at this range have somewhat higher uncertainty.")
+    elif "5 " in horizon_label:
+        insights.append("⚡ Short-range 5-minute forecast — highest confidence prediction window.")
+
+    return insights
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Load all data
+# ──────────────────────────────────────────────────────────────────────────────
+traffic_df = load_traffic_data()
+model, device, scaler_mean, scaler_std = load_model()
+weather_df = load_weather_cache()
+holidays = load_holidays()
+base_profile = load_average_profile()
+
+dataset_start = traffic_df.index[0].date()
+dataset_end = traffic_df.index[-1].date()
+sensor_ids = list(range(traffic_df.shape[1]))
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Header
+# ──────────────────────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="dashboard-header">
+    <h1>🚦 Traffic Flow Forecasting System</h1>
+    <p><span class="live-dot"></span> AI-powered traffic prediction using CADGT &nbsp;•&nbsp; METR-LA Dataset &nbsp;•&nbsp; 207 Sensors</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Sidebar — Shared Controls
+# ──────────────────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style="text-align:center; padding: 12px 0 18px 0;">
+        <span style="font-size:1.6rem;">🎛️</span>
+        <div style="color:#cbd5e1; font-size:1.05rem; font-weight:700; letter-spacing:0.04em; margin-top:4px;">Control Panel</div>
+        <div style="color:#64748b; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.1em;">Smart Traffic Monitoring</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("---")
+
+    sel_sensor = st.selectbox(
+        "📡 Sensor ID",
+        options=sensor_ids,
+        index=100,
+        help="METR-LA sensor index (0–206)",
+    )
+
+    horizon_map = {"5 minutes": 0, "15 minutes": 2, "30 minutes": 5, "60 minutes": 11}
+    sel_horizon_label = st.selectbox(
+        "🎯 Prediction Horizon",
+        options=list(horizon_map.keys()),
+        index=1,
+    )
+    sel_horizon_idx = horizon_map[sel_horizon_label]
+
+    st.markdown("---")
     st.markdown(f"""
-    <div class="pred-card">
-        <div class="pred-card-title">Prediction — Sensor {sensor_id}</div>
-        <div class="speed-container">
-            <div class="speed-block">
-                <div class="speed-label">Predicted Speed ({horizon_label})</div>
-                <div class="speed-value">{predicted_speed:.1f} <span class="speed-unit">mph</span></div>
-                <div class="speed-delta {delta_class}">{delta_sign}{delta:.1f} vs actual</div>
-            </div>
-            <div class="speed-block">
-                <div class="speed-label">Actual Speed ({horizon_label})</div>
-                <div class="speed-value">{actual_speed:.1f} <span class="speed-unit">mph</span></div>
-            </div>
-            <div class="status-block">
-                <div class="speed-label">Status</div>
-                <div class="status-dot {dot_class}"></div>
-                <div class="status-text {text_class}">{status_label}</div>
-            </div>
-        </div>
+    <div style="color:#475569; font-size:0.7rem; text-align:center; line-height:1.6;">
+        <strong style="color:#64748b;">Model:</strong> CADGT v1.0<br>
+        <strong style="color:#64748b;">Dataset:</strong> METR-LA<br>
+        <strong style="color:#64748b;">Sensors:</strong> 207 nodes<br>
+        <strong style="color:#64748b;">Device:</strong> {'CUDA' if device.type == 'cuda' else 'CPU'}
     </div>
     """, unsafe_allow_html=True)
 
-    # --- CHART ---
-    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-    st.subheader(f"Speed Forecast Timeline — Sensor {sensor_id}")
 
-    past_times = np.arange(-55, 5, 5)
-    future_times = np.arange(5, 65, 5)
-    sensor_past = past_speeds[:, sensor_id]
-    sensor_pred = pred_speeds[:, sensor_id]
-    sensor_true = true_speeds[:, sensor_id]
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=np.append(past_times, 5), y=np.append(sensor_past, sensor_pred[0]),
-        mode='lines', name='Historical Context',
-        line=dict(color='#3498db', width=3)
-    ))
-    fig.add_trace(go.Scatter(
-        x=future_times, y=sensor_pred,
-        mode='lines+markers', name='CADGT Forecast',
-        line=dict(color='#2ecc71', width=3, dash='dash'),
-        marker=dict(size=7)
-    ))
-    fig.add_trace(go.Scatter(
-        x=future_times, y=sensor_true,
-        mode='lines', name='True Future',
-        line=dict(color='#e74c3c', width=2),
-        opacity=0.6
-    ))
-    fig.add_vline(x=0, line_dash="dash", line_color="#aaa", annotation_text="Now")
-    fig.update_layout(
-        xaxis_title="Minutes relative to current time",
-        yaxis_title="Speed (mph)",
-        yaxis_range=[0, 75],
-        hovermode="x unified",
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        margin=dict(l=0, r=0, t=30, b=0),
-        xaxis=dict(gridcolor="#f0f0f0"),
-        yaxis=dict(gridcolor="#f0f0f0")
-    )
-    st.plotly_chart(fig, width='stretch')
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # Info bar
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Inference Time", f"{inference_time_ms:.1f} ms")
-    c2.metric("Features Ingested", "10")
-    c3.metric("Model", "CADGT")
+# ──────────────────────────────────────────────────────────────────────────────
+# TABS
+# ──────────────────────────────────────────────────────────────────────────────
+tab1, tab2 = st.tabs(["🔮 Future Forecast Simulator", "📊 Sensor Prediction View"])
 
 
-# ==================== TAB 2: FUTURE FORECAST ====================
-with tab2:
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 1: FUTURE FORECAST SIMULATOR (Live APIs)
+# ══════════════════════════════════════════════════════════════════════════════
+with tab1:
+    st.markdown('<div class="section-header">🔮 Live Future Traffic Prediction</div>', unsafe_allow_html=True)
     st.markdown("""
-    **Simulate traffic in the future.** Pick a date and time — the app will automatically 
-    fetch the live weather forecast from Open-Meteo and check for US holidays.
-    """)
+    <div class="insight-card">
+        Pick any <strong>future date and time</strong> — the system will fetch live weather forecasts from
+        <strong>Open-Meteo API</strong> and check US holidays via <strong>Nager.Date API</strong> to generate a prediction.
+    </div>
+    """, unsafe_allow_html=True)
 
-    fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 2])
-    sensor_id_future = fc1.selectbox(
-        f"Select Sensor (all {dataset_info['num_nodes']})",
-        options=range(dataset_info['num_nodes']),
-        index=50,
-        key="sensor_tab2"
-    )
+    fc1, fc2 = st.columns(2)
     today = datetime.datetime.now()
-    target_d = fc2.date_input("Date", value=today.date(), key="date_tab2")
+    target_d = fc1.date_input("📅 Target Date", value=today.date(), key="date_tab1")
     m = (today.minute // 5) * 5
-    target_t = fc3.time_input("Time", value=datetime.time(today.hour, m), key="time_tab2")
-    horizon_options_f = {"15 min": 2, "30 min": 5, "45 min": 8, "60 min": 11}
-    horizon_label_f = fc4.selectbox("Prediction Horizon", options=list(horizon_options_f.keys()), index=3, key="horizon_tab2")
-    horizon_idx_f = horizon_options_f[horizon_label_f]
+    target_t = fc2.time_input("🕐 Target Time", value=datetime.time(today.hour, m), key="time_tab1")
 
-    if st.button("Generate Future Forecast", type="primary"):
+    if st.button("⚡ Generate Future Forecast", type="primary", use_container_width=True):
         target_datetime = datetime.datetime.combine(target_d, target_t)
 
-        with st.spinner("Fetching Live Weather & Preparing Context..."):
-            weather_df = fetch_future_weather(config['data']['lat'], config['data']['lon'], target_datetime)
-            is_holiday = float(check_holiday(target_datetime))
+        with st.spinner("Fetching Live Weather & Running CADGT..."):
+            # Coordinates for LA (METR-LA dataset location)
+            lat, lon = 34.0522, -118.2437
+            future_weather = fetch_future_weather(lat, lon, target_datetime)
+            is_holiday = check_holiday_api(target_d)
 
+            # Build synthetic input from average traffic profile
             history_times = [target_datetime - datetime.timedelta(minutes=5 * i) for i in range(11, -1, -1)]
-
-            custom_x = np.zeros((1, 12, dataset_info['num_nodes'], 10), dtype=np.float32)
+            custom_x = np.zeros((1, 12, 207, 10), dtype=np.float32)
 
             for i, t_step in enumerate(history_times):
                 tod_idx = (t_step.hour * 60 + t_step.minute) // 5
                 dow_idx = t_step.weekday()
 
                 profiled_traffic_mph = base_profile[tod_idx, dow_idx, :]
-                custom_x[0, i, :, 0] = pip_scaler.transform(profiled_traffic_mph)
+                custom_x[0, i, :, 0] = (profiled_traffic_mph - scaler_mean) / (scaler_std + 1e-5)
 
-                if weather_df is not None:
-                    nearest_weather = weather_df.iloc[(weather_df['time'] - t_step).abs().argsort()[:1]]
-                    temp = nearest_weather["temperature_2m"].values[0]
-                    precip = nearest_weather["precipitation"].values[0]
-                    vis = nearest_weather["visibility"].values[0]
-                    wind = nearest_weather["windspeed_10m"].values[0]
+                if future_weather is not None:
+                    nearest = future_weather.iloc[(future_weather['time'] - t_step).abs().argsort()[:1]]
+                    temp = nearest["temperature_2m"].values[0]
+                    precip = nearest["precipitation"].values[0]
+                    vis = nearest.get("visibility", pd.Series([10000.0])).values[0]
+                    wind = nearest["windspeed_10m"].values[0]
                 else:
                     temp, precip, vis, wind = 20.0, 0.0, 10000.0, 5.0
 
-                w_features = np.array([temp, precip, vis, wind])
-                w_scaled = (w_features - weather_stats[0]) / weather_stats[1]
+                # Simple z-score (profile-level)
+                custom_x[0, i, :, 1] = temp / 20.0
+                custom_x[0, i, :, 2] = precip / 5.0
+                custom_x[0, i, :, 3] = vis / 10000.0
+                custom_x[0, i, :, 4] = wind / 15.0
 
-                custom_x[0, i, :, 1] = w_scaled[0]
-                custom_x[0, i, :, 2] = w_scaled[1]
-                custom_x[0, i, :, 3] = w_scaled[2]
-                custom_x[0, i, :, 4] = w_scaled[3]
-
-                custom_x[0, i, :, 5] = is_holiday
+                custom_x[0, i, :, 5] = float(is_holiday)
 
                 tod_norm = tod_idx / 288.0
                 dow_norm = dow_idx / 7.0
@@ -479,64 +663,308 @@ with tab2:
             latency = (time.time() - start_infer) * 1000
 
             p_future_np = preds_future.cpu().numpy()[0]
-            future_speeds = pip_scaler.inverse_transform(p_future_np)
+            future_speeds_mph = p_future_np * scaler_std + scaler_mean
 
-        # Pick selected horizon prediction for main card
-        future_pred_h = future_speeds[horizon_idx_f, sensor_id_future]
-        dot_cls, txt_cls, stat_lbl = get_traffic_status(future_pred_h)
-        h_str = "Yes" if is_holiday else "No"
+        # Results
+        sensor_future = future_speeds_mph[:, sel_sensor]
+        future_pred = float(sensor_future[sel_horizon_idx])
+        congestion_label, congestion_badge, congestion_icon = get_congestion_info(future_pred)
+        h_str = "🎉 Holiday" if is_holiday else "📋 Regular Day"
         target_display = target_datetime.strftime("%A, %b %d %Y at %I:%M %p")
+        temp_f = temp * 9 / 5 + 32
 
-        st.success(f"Forecast Generated! Inference: {latency:.1f} ms")
+        # Insights
+        future_insights = generate_ai_insights(future_pred, congestion_label, sel_horizon_label, trend_speeds=sensor_future)
 
-        # Future Prediction Card
-        st.markdown(f"""
-        <div class="pred-card">
-            <div class="pred-card-title">Future Prediction — Sensor {sensor_id_future}</div>
-            <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">{target_display}</div>
-            <div class="speed-container">
-                <div class="speed-block">
-                    <div class="speed-label">Predicted Speed ({horizon_label_f})</div>
-                    <div class="speed-value">{future_pred_h:.1f} <span class="speed-unit">mph</span></div>
-                </div>
-                <div class="speed-block">
-                    <div class="speed-label">Weather</div>
-                    <div style="font-size:1.1rem; color:#1a1a2e;">🌡️ {temp:.1f}°C &nbsp; 🌧️ {precip:.1f}mm</div>
-                    <div style="font-size:0.9rem; color:#888; margin-top:0.3rem;">Holiday: {h_str}</div>
-                </div>
-                <div class="status-block">
-                    <div class="speed-label">Status</div>
-                    <div class="status-dot {dot_cls}"></div>
-                    <div class="status-text {txt_cls}">{stat_lbl}</div>
-                </div>
+        # Metrics row
+        st.markdown('<div class="section-header">📊 Forecast Results</div>', unsafe_allow_html=True)
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Predicted Speed</div>
+                <div class="metric-value">{future_pred:.1f} <span style="font-size:0.9rem;color:#64748b;">mph</span></div>
+                <div class="metric-sub">@ {sel_horizon_label} horizon</div>
             </div>
+            """, unsafe_allow_html=True)
+        with m2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Forecast For</div>
+                <div class="metric-value" style="font-size:1.3rem;">{target_datetime.strftime('%H:%M')}</div>
+                <div class="metric-sub">{target_display}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with m3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Weather</div>
+                <div class="metric-value" style="font-size:1.3rem;">🌡️ {temp_f:.0f}°F &nbsp; 🌧️ {precip:.1f}mm</div>
+                <div class="metric-sub">{h_str}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with m4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Congestion Level</div>
+                <div style="margin-top:8px;">
+                    <span style="font-size:1.5rem;">{congestion_icon}</span>
+                    <span class="badge {congestion_badge}" style="margin-left:6px;">{congestion_label}</span>
+                </div>
+                <div class="metric-sub">Inference: {latency:.1f} ms</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Future chart
+        st.markdown('<div class="section-header">📈 Future Speed Timeline</div>', unsafe_allow_html=True)
+        future_minutes = [(i + 1) * 5 for i in range(12)]
+        future_labels = [f"+{m}m" for m in future_minutes]
+
+        fig_f = go.Figure()
+        fig_f.add_trace(go.Scatter(
+            x=future_minutes, y=sensor_future,
+            mode="lines+markers", name="CADGT Forecast",
+            line=dict(color="#a855f7", width=3, shape="spline"),
+            marker=dict(size=7, color="#a855f7", line=dict(width=1, color="#fff")),
+            hovertemplate="<b>+%{x} min</b><br>Predicted: %{y:.1f} mph<extra></extra>",
+        ))
+        fig_f.add_vline(x=future_minutes[sel_horizon_idx], line_dash="dash", line_color="#6366f1", opacity=0.6,
+                        annotation_text=f"Selected: {sel_horizon_label}", annotation_font_color="#a5b4fc", annotation_font_size=11)
+        fig_f.add_hrect(y0=50, y1=80, fillcolor="rgba(16,185,129,0.06)", line_width=0,
+                        annotation_text="Free Flow", annotation_position="top right", annotation_font=dict(color="#6ee7b7", size=10))
+        fig_f.add_hrect(y0=30, y1=50, fillcolor="rgba(245,158,11,0.06)", line_width=0,
+                        annotation_text="Moderate", annotation_position="top right", annotation_font=dict(color="#fbbf24", size=10))
+        fig_f.add_hrect(y0=0, y1=30, fillcolor="rgba(244,63,94,0.06)", line_width=0,
+                        annotation_text="Congested", annotation_position="top right", annotation_font=dict(color="#fb7185", size=10))
+        fig_f.update_layout(
+            template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Inter", color="#94a3b8"),
+            title=dict(text=f"Future Forecast — Sensor #{sel_sensor}", font=dict(size=16, color="#e2e8f0")),
+            xaxis=dict(title="Minutes from Selected Time", gridcolor="rgba(148,163,184,0.1)", tickvals=future_minutes, ticktext=future_labels),
+            yaxis=dict(title="Speed (mph)", gridcolor="rgba(148,163,184,0.1)", range=[0, max(80, max(sensor_future) + 10)]),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
+            margin=dict(l=50, r=30, t=60, b=50), height=420, hovermode="x unified",
+        )
+        st.plotly_chart(fig_f, width='stretch', key="future_chart")
+
+        # AI Insights
+        st.markdown('<div class="section-header">🤖 AI Traffic Insights</div>', unsafe_allow_html=True)
+        for insight in future_insights:
+            st.markdown(f'<div class="insight-card">{insight}</div>', unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 2: SENSOR PREDICTION VIEW (Historical Replay)
+# ══════════════════════════════════════════════════════════════════════════════
+with tab2:
+    st.markdown('<div class="section-header">📅 Historical Data Explorer</div>', unsafe_allow_html=True)
+
+    h1, h2 = st.columns(2)
+    sel_date = h1.date_input(
+        "📅 Select Date",
+        value=datetime.date(2012, 4, 15),
+        min_value=dataset_start,
+        max_value=dataset_end,
+        help=f"METR-LA range: {dataset_start} to {dataset_end}",
+        key="date_tab2"
+    )
+    sel_time = h2.time_input(
+        "🕐 Select Time",
+        value=datetime.time(8, 45),
+        step=datetime.timedelta(minutes=5),
+        help="24-hour format, 5-minute intervals",
+        key="time_tab2"
+    )
+
+    # Run prediction
+    target_datetime = datetime.datetime.combine(sel_date, sel_time)
+    target_ts = pd.Timestamp(target_datetime)
+
+    input_tensor, actual_timestamps, found_in_dataset = build_input_tensor(
+        traffic_df, weather_df, holidays, target_ts, scaler_mean, scaler_std
+    )
+
+    with torch.no_grad():
+        input_tensor_dev = input_tensor.to(device)
+        preds_raw = model(input_tensor_dev)
+        preds_np = preds_raw.cpu().numpy()[0]
+
+    # Inverse transform to mph (raw METR-LA units)
+    preds_mph = preds_np * scaler_std + scaler_mean
+    sensor_preds_mph = preds_mph[:, sel_sensor]
+    pred_speed = float(sensor_preds_mph[sel_horizon_idx])
+
+    # Actual speed
+    actual_speed = None
+    if found_in_dataset:
+        horizon_offset = (sel_horizon_idx + 1) * 5
+        future_ts = target_ts + pd.Timedelta(minutes=horizon_offset)
+        if future_ts in traffic_df.index:
+            actual_speed = float(traffic_df.loc[future_ts].iloc[sel_sensor])
+
+    congestion_label, congestion_badge, congestion_icon = get_congestion_info(pred_speed)
+    weather_info = get_weather_display(weather_df, target_ts)
+    is_holiday = sel_date in holidays
+    insights = generate_ai_insights(pred_speed, congestion_label, sel_horizon_label, actual_speed=actual_speed, trend_speeds=sensor_preds_mph)
+
+    # ── Metrics ──
+    st.markdown('<div class="section-header">📊 Prediction Results</div>', unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Predicted Speed</div>
+            <div class="metric-value">{pred_speed:.1f} <span style="font-size:0.9rem;color:#64748b;">mph</span></div>
+            <div class="metric-sub">@ {sel_horizon_label} horizon</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Prediction Time</div>
+            <div class="metric-value">{sel_time.strftime('%H:%M')}</div>
+            <div class="metric-sub">{sel_date.strftime('%B %d, %Y')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Sensor Station</div>
+            <div class="metric-value">#{sel_sensor}</div>
+            <div class="metric-sub">METR-LA network node</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Congestion Level</div>
+            <div style="margin-top:8px;">
+                <span style="font-size:1.5rem;">{congestion_icon}</span>
+                <span class="badge {congestion_badge}" style="margin-left:6px;">{congestion_label}</span>
+            </div>
+            <div class="metric-sub">Based on predicted speed</div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Future Chart
-        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-        st.subheader(f"Future Speed Timeline — Sensor {sensor_id_future}")
+    # ── Chart + Info ──
+    st.markdown('<div class="section-header">📈 Traffic Visualization</div>', unsafe_allow_html=True)
+    chart_col, info_col = st.columns([3, 1.3])
 
-        f_times = [target_datetime + datetime.timedelta(minutes=5 * (i + 1)) for i in range(12)]
-        sensor_f_pred = future_speeds[:, sensor_id_future]
+    with chart_col:
+        future_minutes = [(i + 1) * 5 for i in range(12)]
+        future_labels = [f"+{m}m" for m in future_minutes]
 
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(
-            x=f_times, y=sensor_f_pred,
-            mode='lines+markers', name='CADGT Future Forecast',
-            line=dict(color='#9b59b6', width=3),
-            marker=dict(size=8)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=future_minutes, y=sensor_preds_mph,
+            mode="lines+markers", name="Predicted Speed",
+            line=dict(color="#f43f5e", width=3, shape="spline"),
+            marker=dict(size=7, color="#f43f5e", line=dict(width=1, color="#fff")),
+            hovertemplate="<b>+%{x} min</b><br>Predicted: %{y:.1f} mph<extra></extra>",
         ))
-        fig2.update_layout(
-            xaxis_title="Time",
-            yaxis_title="Predicted Speed (mph)",
-            yaxis_range=[0, 75],
-            hovermode="x unified",
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            margin=dict(l=0, r=0, t=30, b=0),
-            xaxis=dict(gridcolor="#f0f0f0"),
-            yaxis=dict(gridcolor="#f0f0f0")
+
+        if found_in_dataset:
+            actual_future_speeds = []
+            actual_future_valid = []
+            for i in range(12):
+                ft = target_ts + pd.Timedelta(minutes=(i + 1) * 5)
+                if ft in traffic_df.index:
+                    actual_future_speeds.append(float(traffic_df.loc[ft].iloc[sel_sensor]))
+                    actual_future_valid.append(future_minutes[i])
+                else:
+                    actual_future_speeds.append(None)
+                    actual_future_valid.append(future_minutes[i])
+
+            actual_filtered = [(x, y) for x, y in zip(actual_future_valid, actual_future_speeds) if y is not None]
+            if actual_filtered:
+                ax, ay = zip(*actual_filtered)
+                fig.add_trace(go.Scatter(
+                    x=list(ax), y=list(ay),
+                    mode="lines+markers", name="Actual Speed",
+                    line=dict(color="#3b82f6", width=3, shape="spline"),
+                    marker=dict(size=7, color="#3b82f6", symbol="diamond", line=dict(width=1, color="#fff")),
+                    hovertemplate="<b>+%{x} min</b><br>Actual: %{y:.1f} mph<extra></extra>",
+                ))
+
+        fig.add_vline(x=future_minutes[sel_horizon_idx], line_dash="dash", line_color="#6366f1", opacity=0.6,
+                      annotation_text=f"Selected: {sel_horizon_label}", annotation_font_color="#a5b4fc", annotation_font_size=11)
+        fig.add_hrect(y0=50, y1=max(80, max(sensor_preds_mph) + 10), fillcolor="rgba(16,185,129,0.06)", line_width=0,
+                      annotation_text="Free Flow", annotation_position="top right", annotation_font=dict(color="#6ee7b7", size=10))
+        fig.add_hrect(y0=30, y1=50, fillcolor="rgba(245,158,11,0.06)", line_width=0,
+                      annotation_text="Moderate", annotation_position="top right", annotation_font=dict(color="#fbbf24", size=10))
+        fig.add_hrect(y0=0, y1=30, fillcolor="rgba(244,63,94,0.06)", line_width=0,
+                      annotation_text="Congested", annotation_position="top right", annotation_font=dict(color="#fb7185", size=10))
+
+        fig.update_layout(
+            template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Inter", color="#94a3b8"),
+            title=dict(text=f"Traffic Speed Forecast — Sensor #{sel_sensor}", font=dict(size=16, color="#e2e8f0")),
+            xaxis=dict(title="Minutes from Selected Time", gridcolor="rgba(148,163,184,0.1)", tickvals=future_minutes, ticktext=future_labels),
+            yaxis=dict(title="Speed (mph)", gridcolor="rgba(148,163,184,0.1)", range=[0, max(80, max(sensor_preds_mph) + 15)]),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
+            margin=dict(l=50, r=30, t=60, b=50), height=420, hovermode="x unified",
         )
-        st.plotly_chart(fig2, width='stretch')
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.plotly_chart(fig, width='stretch', key="main_chart")
+
+    with info_col:
+        st.markdown('<div class="section-header">🔄 Traffic Change</div>', unsafe_allow_html=True)
+        if actual_speed is not None:
+            change = pred_speed - actual_speed
+            if change > 0:
+                change_html = f'<span class="change-up">+{change:.1f} mph ↑</span>'
+            elif change < 0:
+                change_html = f'<span class="change-down">{change:.1f} mph ↓</span>'
+            else:
+                change_html = '<span class="change-neutral">0.0 mph →</span>'
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Actual Speed</div>
+                <div class="metric-value" style="font-size:1.4rem;">{actual_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Predicted Speed</div>
+                <div class="metric-value" style="font-size:1.4rem;">{pred_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Traffic Change</div>
+                <div style="margin-top:6px;">{change_html}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Predicted Speed</div>
+                <div class="metric-value" style="font-size:1.4rem;">{pred_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
+                <div class="metric-sub" style="margin-top:8px;color:#f59e0b;">
+                    ⚠️ Actual data not available for this timestamp.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('<div class="section-header">🤖 AI Insights</div>', unsafe_allow_html=True)
+        for insight in insights:
+            st.markdown(f'<div class="insight-card">{insight}</div>', unsafe_allow_html=True)
+
+    # ── Weather & Holiday ──
+    st.markdown('<div class="section-header">🌍 Context Information</div>', unsafe_allow_html=True)
+    w1, w2, w3, w4, w5 = st.columns(5)
+    with w1:
+        st.markdown(f"""<div class="weather-card"><div class="weather-icon">{weather_info['icon']}</div><div class="weather-temp">{weather_info['temp']}</div><div class="weather-label">Temperature</div></div>""", unsafe_allow_html=True)
+    with w2:
+        st.markdown(f"""<div class="weather-card"><div class="weather-icon">🌤️</div><div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['type']}</div><div class="weather-label">Weather Type</div></div>""", unsafe_allow_html=True)
+    with w3:
+        st.markdown(f"""<div class="weather-card"><div class="weather-icon">💧</div><div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['precip']}</div><div class="weather-label">Precipitation</div></div>""", unsafe_allow_html=True)
+    with w4:
+        st.markdown(f"""<div class="weather-card"><div class="weather-icon">💨</div><div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['wind']}</div><div class="weather-label">Wind Speed</div></div>""", unsafe_allow_html=True)
+    with w5:
+        pill = '<span class="holiday-pill holiday-yes">🎉 Holiday</span>' if is_holiday else '<span class="holiday-pill holiday-no">📋 Regular Day</span>'
+        st.markdown(f"""<div class="weather-card"><div class="weather-icon">📅</div><div style="margin-top:8px;">{pill}</div><div class="weather-label" style="margin-top:6px;">Holiday Status</div></div>""", unsafe_allow_html=True)
+
+
+# ── Footer ──
+st.markdown("""
+<div style="text-align:center; padding:30px 0 10px 0; color:#475569; font-size:0.72rem; letter-spacing:0.04em;">
+    Traffic Flow Forecasting &amp; Congestion Behaviour Analysis &nbsp;•&nbsp; CADGT &nbsp;•&nbsp; METR-LA Dataset<br>
+    Context-Aware Dynamic Graph Transformer &nbsp;|&nbsp; Intelligent Transportation System
+</div>
+""", unsafe_allow_html=True)
