@@ -9,6 +9,7 @@ matplotlib
 tensorboard
 streamlit
 plotly
+altair<5
 openmeteo-requests
 requests-cache
 retry-requests
