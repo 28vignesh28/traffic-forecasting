@@ -339,8 +339,15 @@ def load_average_profile():
 
 @st.cache_data(ttl=3600)
 def fetch_future_weather(lat, lon, target_date):
-    """Fetches hourly weather forecast from Open-Meteo for a future date."""
-    url = "https://api.open-meteo.com/v1/forecast"
+    """Fetches hourly weather forecast from Open-Meteo for a future date, or historical archive for past dates."""
+    today = datetime.datetime.now().date()
+    
+    # Open-Meteo requires different endpoints for past vs future
+    if target_date.date() < today:
+        url = "https://archive-api.open-meteo.com/v1/archive"
+    else:
+        url = "https://api.open-meteo.com/v1/forecast"
+        
     params = {
         "latitude": lat, "longitude": lon,
         "hourly": ["temperature_2m", "precipitation", "visibility", "windspeed_10m"],
@@ -348,6 +355,11 @@ def fetch_future_weather(lat, lon, target_date):
         "start_date": target_date.strftime("%Y-%m-%d"),
         "end_date": (target_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     }
+    
+    # Archive API doesn't have visibility, provide default if needed
+    if "archive" in url:
+        params["hourly"] = ["temperature_2m", "precipitation", "windspeed_10m"]
+        
     try:
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
@@ -358,7 +370,7 @@ def fetch_future_weather(lat, lon, target_date):
             df["visibility"] = 10000.0
         return df
     except Exception as e:
-        st.error(f"Failed to fetch live weather forecast: {e}")
+        st.error(f"Failed to fetch weather data: {e}")
         return None
 
 
@@ -569,14 +581,6 @@ with st.sidebar:
         help="METR-LA sensor index (0–206)",
     )
 
-    horizon_map = {"5 minutes": 0, "15 minutes": 2, "30 minutes": 5, "60 minutes": 11}
-    sel_horizon_label = st.selectbox(
-        "🎯 Prediction Horizon",
-        options=list(horizon_map.keys()),
-        index=1,
-    )
-    sel_horizon_idx = horizon_map[sel_horizon_label]
-
     st.markdown("---")
     st.markdown(f"""
     <div style="color:#475569; font-size:0.7rem; text-align:center; line-height:1.6;">
@@ -608,7 +612,8 @@ with tab1:
 
     fc1, fc2 = st.columns(2)
     today = datetime.datetime.now()
-    target_d = fc1.date_input("📅 Target Date", value=today.date(), key="date_tab1")
+    default_sim_date = datetime.date(2012, 7, 1) if dataset_end < today.date() else today.date()
+    target_d = fc1.date_input("📅 Target Date", value=default_sim_date, key="date_tab1")
     m = (today.minute // 5) * 5
     target_t = fc2.time_input("🕐 Target Time", value=datetime.time(today.hour, m), key="time_tab1")
 
@@ -667,55 +672,13 @@ with tab1:
 
         # Results
         sensor_future = future_speeds_mph[:, sel_sensor]
-        future_pred = float(sensor_future[sel_horizon_idx])
-        congestion_label, congestion_badge, congestion_icon = get_congestion_info(future_pred)
+        
+        # We will show weather/time in a separate row, then the 4 horizons
         h_str = "🎉 Holiday" if is_holiday else "📋 Regular Day"
         target_display = target_datetime.strftime("%A, %b %d %Y at %I:%M %p")
         temp_f = temp * 9 / 5 + 32
 
-        # Insights
-        future_insights = generate_ai_insights(future_pred, congestion_label, sel_horizon_label, trend_speeds=sensor_future)
-
-        # Metrics row
-        st.markdown('<div class="section-header">📊 Forecast Results</div>', unsafe_allow_html=True)
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Predicted Speed</div>
-                <div class="metric-value">{future_pred:.1f} <span style="font-size:0.9rem;color:#64748b;">mph</span></div>
-                <div class="metric-sub">@ {sel_horizon_label} horizon</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with m2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Forecast For</div>
-                <div class="metric-value" style="font-size:1.3rem;">{target_datetime.strftime('%H:%M')}</div>
-                <div class="metric-sub">{target_display}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with m3:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Weather</div>
-                <div class="metric-value" style="font-size:1.3rem;">🌡️ {temp_f:.0f}°F &nbsp; 🌧️ {precip:.1f}mm</div>
-                <div class="metric-sub">{h_str}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with m4:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Congestion Level</div>
-                <div style="margin-top:8px;">
-                    <span style="font-size:1.5rem;">{congestion_icon}</span>
-                    <span class="badge {congestion_badge}" style="margin-left:6px;">{congestion_label}</span>
-                </div>
-                <div class="metric-sub">Inference: {latency:.1f} ms</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        # Future chart
+        # We will show the chart first, then the 4 horizons
         st.markdown('<div class="section-header">📈 Future Speed Timeline</div>', unsafe_allow_html=True)
         future_minutes = [(i + 1) * 5 for i in range(12)]
         future_labels = [f"+{m}m" for m in future_minutes]
@@ -728,8 +691,6 @@ with tab1:
             marker=dict(size=7, color="#a855f7", line=dict(width=1, color="#fff")),
             hovertemplate="<b>+%{x} min</b><br>Predicted: %{y:.1f} mph<extra></extra>",
         ))
-        fig_f.add_vline(x=future_minutes[sel_horizon_idx], line_dash="dash", line_color="#6366f1", opacity=0.6,
-                        annotation_text=f"Selected: {sel_horizon_label}", annotation_font_color="#a5b4fc", annotation_font_size=11)
         fig_f.add_hrect(y0=50, y1=80, fillcolor="rgba(16,185,129,0.06)", line_width=0,
                         annotation_text="Free Flow", annotation_position="top right", annotation_font=dict(color="#6ee7b7", size=10))
         fig_f.add_hrect(y0=30, y1=50, fillcolor="rgba(245,158,11,0.06)", line_width=0,
@@ -747,8 +708,31 @@ with tab1:
         )
         st.plotly_chart(fig_f, width='stretch', key="future_chart")
 
+        # 4 Prediction Horizons
+        st.markdown('<div class="section-header">📊 All Prediction Horizons</div>', unsafe_allow_html=True)
+        h_cols = st.columns(4)
+        horizons_to_show = [(0, "5 min"), (2, "15 min"), (5, "30 min"), (11, "60 min")]
+        
+        for col, (h_idx, h_label) in zip(h_cols, horizons_to_show):
+            h_pred = float(sensor_future[h_idx])
+            h_cong_lbl, h_cong_bdg, h_cong_icn = get_congestion_info(h_pred)
+            with col:
+                st.markdown(f"""
+                <div class="metric-card" style="padding:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="metric-label" style="font-size:0.9rem; margin:0;">{h_label} Forecast</span>
+                        <span class="badge {h_cong_bdg}" style="font-size:0.65rem; padding:2px 8px;">{h_cong_lbl}</span>
+                    </div>
+                    <div class="metric-value" style="font-size:2rem; margin-top:12px;">{h_pred:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
+                </div>
+                """, unsafe_allow_html=True)
+
         # AI Insights
         st.markdown('<div class="section-header">🤖 AI Traffic Insights</div>', unsafe_allow_html=True)
+        # Generate overall insights based on the 60-min horizon
+        future_pred_overall = float(sensor_future[11])
+        cong_lbl_overall, _, _ = get_congestion_info(future_pred_overall)
+        future_insights = generate_ai_insights(future_pred_overall, cong_lbl_overall, "60 minutes", trend_speeds=sensor_future)
         for insight in future_insights:
             st.markdown(f'<div class="insight-card">{insight}</div>', unsafe_allow_html=True)
 
@@ -789,161 +773,118 @@ with tab2:
         preds_raw = model(input_tensor_dev)
         preds_np = preds_raw.cpu().numpy()[0]
 
+    weather_info = get_weather_display(weather_df, target_ts)
+    is_holiday = sel_date in holidays
+
     # Inverse transform to mph (raw METR-LA units)
     preds_mph = preds_np * scaler_std + scaler_mean
     sensor_preds_mph = preds_mph[:, sel_sensor]
-    pred_speed = float(sensor_preds_mph[sel_horizon_idx])
 
-    # Actual speed
-    actual_speed = None
-    if found_in_dataset:
-        horizon_offset = (sel_horizon_idx + 1) * 5
-        future_ts = target_ts + pd.Timedelta(minutes=horizon_offset)
-        if future_ts in traffic_df.index:
-            actual_speed = float(traffic_df.loc[future_ts].iloc[sel_sensor])
-
-    congestion_label, congestion_badge, congestion_icon = get_congestion_info(pred_speed)
-    weather_info = get_weather_display(weather_df, target_ts)
-    is_holiday = sel_date in holidays
-    insights = generate_ai_insights(pred_speed, congestion_label, sel_horizon_label, actual_speed=actual_speed, trend_speeds=sensor_preds_mph)
-
-    # ── Metrics ──
-    st.markdown('<div class="section-header">📊 Prediction Results</div>', unsafe_allow_html=True)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Predicted Speed</div>
-            <div class="metric-value">{pred_speed:.1f} <span style="font-size:0.9rem;color:#64748b;">mph</span></div>
-            <div class="metric-sub">@ {sel_horizon_label} horizon</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Prediction Time</div>
-            <div class="metric-value">{sel_time.strftime('%H:%M')}</div>
-            <div class="metric-sub">{sel_date.strftime('%B %d, %Y')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Sensor Station</div>
-            <div class="metric-value">#{sel_sensor}</div>
-            <div class="metric-sub">METR-LA network node</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Congestion Level</div>
-            <div style="margin-top:8px;">
-                <span style="font-size:1.5rem;">{congestion_icon}</span>
-                <span class="badge {congestion_badge}" style="margin-left:6px;">{congestion_label}</span>
-            </div>
-            <div class="metric-sub">Based on predicted speed</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # ── Chart + Info ──
+    # Chart + Info goes first since it shows the timeline
     st.markdown('<div class="section-header">📈 Traffic Visualization</div>', unsafe_allow_html=True)
-    chart_col, info_col = st.columns([3, 1.3])
+    future_minutes = [(i + 1) * 5 for i in range(12)]
+    future_labels = [f"+{m}m" for m in future_minutes]
 
-    with chart_col:
-        future_minutes = [(i + 1) * 5 for i in range(12)]
-        future_labels = [f"+{m}m" for m in future_minutes]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=future_minutes, y=sensor_preds_mph,
+        mode="lines+markers", name="Predicted Speed",
+        line=dict(color="#f43f5e", width=3, shape="spline"),
+        marker=dict(size=7, color="#f43f5e", line=dict(width=1, color="#fff")),
+        hovertemplate="<b>+%{x} min</b><br>Predicted: %{y:.1f} mph<extra></extra>",
+    ))
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=future_minutes, y=sensor_preds_mph,
-            mode="lines+markers", name="Predicted Speed",
-            line=dict(color="#f43f5e", width=3, shape="spline"),
-            marker=dict(size=7, color="#f43f5e", line=dict(width=1, color="#fff")),
-            hovertemplate="<b>+%{x} min</b><br>Predicted: %{y:.1f} mph<extra></extra>",
-        ))
-
-        if found_in_dataset:
-            actual_future_speeds = []
-            actual_future_valid = []
-            for i in range(12):
-                ft = target_ts + pd.Timedelta(minutes=(i + 1) * 5)
-                if ft in traffic_df.index:
-                    actual_future_speeds.append(float(traffic_df.loc[ft].iloc[sel_sensor]))
-                    actual_future_valid.append(future_minutes[i])
-                else:
-                    actual_future_speeds.append(None)
-                    actual_future_valid.append(future_minutes[i])
-
-            actual_filtered = [(x, y) for x, y in zip(actual_future_valid, actual_future_speeds) if y is not None]
-            if actual_filtered:
-                ax, ay = zip(*actual_filtered)
-                fig.add_trace(go.Scatter(
-                    x=list(ax), y=list(ay),
-                    mode="lines+markers", name="Actual Speed",
-                    line=dict(color="#3b82f6", width=3, shape="spline"),
-                    marker=dict(size=7, color="#3b82f6", symbol="diamond", line=dict(width=1, color="#fff")),
-                    hovertemplate="<b>+%{x} min</b><br>Actual: %{y:.1f} mph<extra></extra>",
-                ))
-
-        fig.add_vline(x=future_minutes[sel_horizon_idx], line_dash="dash", line_color="#6366f1", opacity=0.6,
-                      annotation_text=f"Selected: {sel_horizon_label}", annotation_font_color="#a5b4fc", annotation_font_size=11)
-        fig.add_hrect(y0=50, y1=max(80, max(sensor_preds_mph) + 10), fillcolor="rgba(16,185,129,0.06)", line_width=0,
-                      annotation_text="Free Flow", annotation_position="top right", annotation_font=dict(color="#6ee7b7", size=10))
-        fig.add_hrect(y0=30, y1=50, fillcolor="rgba(245,158,11,0.06)", line_width=0,
-                      annotation_text="Moderate", annotation_position="top right", annotation_font=dict(color="#fbbf24", size=10))
-        fig.add_hrect(y0=0, y1=30, fillcolor="rgba(244,63,94,0.06)", line_width=0,
-                      annotation_text="Congested", annotation_position="top right", annotation_font=dict(color="#fb7185", size=10))
-
-        fig.update_layout(
-            template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Inter", color="#94a3b8"),
-            title=dict(text=f"Traffic Speed Forecast — Sensor #{sel_sensor}", font=dict(size=16, color="#e2e8f0")),
-            xaxis=dict(title="Minutes from Selected Time", gridcolor="rgba(148,163,184,0.1)", tickvals=future_minutes, ticktext=future_labels),
-            yaxis=dict(title="Speed (mph)", gridcolor="rgba(148,163,184,0.1)", range=[0, max(80, max(sensor_preds_mph) + 15)]),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
-            margin=dict(l=50, r=30, t=60, b=50), height=420, hovermode="x unified",
-        )
-        st.plotly_chart(fig, width='stretch', key="main_chart")
-
-    with info_col:
-        st.markdown('<div class="section-header">🔄 Traffic Change</div>', unsafe_allow_html=True)
-        if actual_speed is not None:
-            change = pred_speed - actual_speed
-            if change > 0:
-                change_html = f'<span class="change-up">+{change:.1f} mph ↑</span>'
-            elif change < 0:
-                change_html = f'<span class="change-down">{change:.1f} mph ↓</span>'
+    if found_in_dataset:
+        actual_future_speeds = []
+        actual_future_valid = []
+        for i in range(12):
+            ft = target_ts + pd.Timedelta(minutes=(i + 1) * 5)
+            if ft in traffic_df.index:
+                actual_future_speeds.append(float(traffic_df.loc[ft].iloc[sel_sensor]))
+                actual_future_valid.append(future_minutes[i])
             else:
-                change_html = '<span class="change-neutral">0.0 mph →</span>'
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Actual Speed</div>
-                <div class="metric-value" style="font-size:1.4rem;">{actual_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Predicted Speed</div>
-                <div class="metric-value" style="font-size:1.4rem;">{pred_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Traffic Change</div>
-                <div style="margin-top:6px;">{change_html}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Predicted Speed</div>
-                <div class="metric-value" style="font-size:1.4rem;">{pred_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
-                <div class="metric-sub" style="margin-top:8px;color:#f59e0b;">
-                    ⚠️ Actual data not available for this timestamp.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+                actual_future_speeds.append(None)
+                actual_future_valid.append(future_minutes[i])
 
-        st.markdown('<div class="section-header">🤖 AI Insights</div>', unsafe_allow_html=True)
-        for insight in insights:
-            st.markdown(f'<div class="insight-card">{insight}</div>', unsafe_allow_html=True)
+        actual_filtered = [(x, y) for x, y in zip(actual_future_valid, actual_future_speeds) if y is not None]
+        if actual_filtered:
+            ax, ay = zip(*actual_filtered)
+            fig.add_trace(go.Scatter(
+                x=list(ax), y=list(ay),
+                mode="lines+markers", name="Actual Speed",
+                line=dict(color="#3b82f6", width=3, shape="spline"),
+                marker=dict(size=7, color="#3b82f6", symbol="diamond", line=dict(width=1, color="#fff")),
+                hovertemplate="<b>+%{x} min</b><br>Actual: %{y:.1f} mph<extra></extra>",
+            ))
+
+    fig.add_hrect(y0=50, y1=max(80, max(sensor_preds_mph) + 10), fillcolor="rgba(16,185,129,0.06)", line_width=0,
+                  annotation_text="Free Flow", annotation_position="top right", annotation_font=dict(color="#6ee7b7", size=10))
+    fig.add_hrect(y0=30, y1=50, fillcolor="rgba(245,158,11,0.06)", line_width=0,
+                  annotation_text="Moderate", annotation_position="top right", annotation_font=dict(color="#fbbf24", size=10))
+    fig.add_hrect(y0=0, y1=30, fillcolor="rgba(244,63,94,0.06)", line_width=0,
+                  annotation_text="Congested", annotation_position="top right", annotation_font=dict(color="#fb7185", size=10))
+
+    fig.update_layout(
+        template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter", color="#94a3b8"),
+        title=dict(text=f"Traffic Speed Forecast — Sensor #{sel_sensor}", font=dict(size=16, color="#e2e8f0")),
+        xaxis=dict(title="Minutes from Selected Time", gridcolor="rgba(148,163,184,0.1)", tickvals=future_minutes, ticktext=future_labels),
+        yaxis=dict(title="Speed (mph)", gridcolor="rgba(148,163,184,0.1)", range=[0, max(80, max(sensor_preds_mph) + 15)]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
+        margin=dict(l=50, r=30, t=60, b=50), height=420, hovermode="x unified",
+    )
+    st.plotly_chart(fig, width='stretch', key="main_chart")
+
+    # Metrics row for the 4 horizons
+    st.markdown('<div class="section-header">📊 All Prediction Horizons</div>', unsafe_allow_html=True)
+    h_cols = st.columns(4)
+    horizons_to_show = [(0, "5 min"), (2, "15 min"), (5, "30 min"), (11, "60 min")]
+    
+    for col, (h_idx, h_label) in zip(h_cols, horizons_to_show):
+        h_pred = float(sensor_preds_mph[h_idx])
+        h_cong_lbl, h_cong_bdg, h_cong_icn = get_congestion_info(h_pred)
+        
+        # Determine actual speed for this horizon if available
+        h_actual = None
+        if found_in_dataset:
+            future_t = target_ts + pd.Timedelta(minutes=(h_idx + 1) * 5)
+            if future_t in traffic_df.index:
+                h_actual = float(traffic_df.loc[future_t].iloc[sel_sensor])
+                
+        metrics_html = f"""
+        <div class="metric-card" style="padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="metric-label" style="font-size:0.9rem; margin:0;">{h_label} Forecast</span>
+                <span class="badge {h_cong_bdg}" style="font-size:0.65rem; padding:2px 8px;">{h_cong_lbl}</span>
+            </div>
+            <div class="metric-value" style="font-size:2rem; margin-top:12px;">{h_pred:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
+        """
+        
+        if h_actual is not None:
+            change = h_pred - h_actual
+            diff_color = "#f43f5e" if change > 0 else "#10b981"
+            diff_arrow = "↑" if change > 0 else "↓"
+            diff_text = f"{abs(change):.1f}"
+            if abs(change) < 0.1:
+                diff_color = "#94a3b8"
+                diff_arrow = "→"
+                
+            metrics_html += f"""
+            <div style="margin-top:8px; display:flex; justify-content:space-between; font-size:0.8rem;">
+                <span style="color:#94a3b8;">Actual: {h_actual:.1f}</span>
+                <span style="color:{diff_color}; font-weight:600;">{diff_arrow} {diff_text}</span>
+            </div>
+            """
+        
+        metrics_html += "</div>"
+        
+
+
+    st.markdown('<div class="section-header">🤖 AI Insights</div>', unsafe_allow_html=True)
+    # Re-generate insights using the 60-min horizon as the "overall" picture
+    insights = generate_ai_insights(float(sensor_preds_mph[11]), "Moderate Traffic", "60 minutes", actual_speed=None, trend_speeds=sensor_preds_mph)
+    for insight in insights:
+        st.markdown(f'<div class="insight-card">{insight}</div>', unsafe_allow_html=True)
 
     # ── Weather & Holiday ──
     st.markdown('<div class="section-header">🌍 Context Information</div>', unsafe_allow_html=True)
