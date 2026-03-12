@@ -384,7 +384,7 @@ with tab1:
         xaxis=dict(gridcolor="#f0f0f0"),
         yaxis=dict(gridcolor="#f0f0f0")
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Info bar
@@ -517,5 +517,5 @@ with tab2:
             xaxis=dict(gridcolor="#f0f0f0"),
             yaxis=dict(gridcolor="#f0f0f0")
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width='stretch')
         st.markdown('</div>', unsafe_allow_html=True)
