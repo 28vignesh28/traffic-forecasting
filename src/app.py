@@ -196,9 +196,15 @@ section[data-testid="stSidebar"] .stNumberInput label {
     border-radius: 16px;
     padding: 24px 28px;
     text-align: center;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 .weather-icon { font-size: 2.6rem; margin-bottom: 6px; }
 .weather-temp { font-size: 2rem; font-weight: 700; color: #1e293b; }
+.weather-value { font-size: 1.2rem; font-weight: 600; color: #1e293b; margin-top: 4px; }
 .weather-label { font-size: 0.9rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; font-weight: 600; }
 
 /* ── Holiday pill ── */
@@ -243,7 +249,13 @@ section[data-testid="stSidebar"] .stNumberInput label {
 /* ── Hide default Streamlit branding ── */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
+header[data-testid="stHeader"] {
+    background: transparent !important;
+}
+/* Hide the header decoration but keep the sidebar toggle button */
+header[data-testid="stHeader"]::after {
+    display: none;
+}
 
 /* ── Plotly container rounding ── */
 .stPlotlyChart {
@@ -545,7 +557,12 @@ with st.sidebar:
         "📡 Sensor ID",
         options=sensor_ids,
         index=91,
-        help="METR-LA sensor index (0–206)",
+        help=(
+            "Select a traffic sensor from the METR-LA network (0–206). "
+            "Each sensor corresponds to a loop-detector station on the Los Angeles County highway system. "
+            "The METR-LA dataset contains 207 sensors spread across major freeways (I-5, I-10, I-101, I-405, etc.). "
+            "Different sensor IDs capture traffic at different geographic locations, so predictions vary by sensor."
+        ),
     )
 
     horizon_map = {"5 minutes": 0, "15 minutes": 2, "30 minutes": 5, "60 minutes": 11}
@@ -736,7 +753,7 @@ with w2:
     st.markdown(f"""
     <div class="weather-card">
         <div class="weather-icon">🌤️</div>
-        <div style="font-size:1.2rem;font-weight:600;color:#1e293b;margin-top:4px;">{weather_info['type']}</div>
+        <div class="weather-value">{weather_info['type']}</div>
         <div class="weather-label">Weather Type</div>
     </div>
     """, unsafe_allow_html=True)
@@ -745,7 +762,7 @@ with w3:
     st.markdown(f"""
     <div class="weather-card">
         <div class="weather-icon">💧</div>
-        <div style="font-size:1.2rem;font-weight:600;color:#1e293b;margin-top:4px;">{weather_info['precip']}</div>
+        <div class="weather-value">{weather_info['precip']}</div>
         <div class="weather-label">Precipitation</div>
     </div>
     """, unsafe_allow_html=True)
@@ -754,7 +771,7 @@ with w4:
     st.markdown(f"""
     <div class="weather-card">
         <div class="weather-icon">💨</div>
-        <div style="font-size:1.2rem;font-weight:600;color:#1e293b;margin-top:4px;">{weather_info['wind']}</div>
+        <div class="weather-value">{weather_info['wind']}</div>
         <div class="weather-label">Wind Speed</div>
     </div>
     """, unsafe_allow_html=True)
@@ -767,8 +784,8 @@ with w5:
     st.markdown(f"""
     <div class="weather-card">
         <div class="weather-icon">📅</div>
-        <div style="margin-top:8px;">{pill}</div>
-        <div class="weather-label" style="margin-top:6px;">Holiday Status</div>
+        <div>{pill}</div>
+        <div class="weather-label">Holiday Status</div>
     </div>
     """, unsafe_allow_html=True)
 
