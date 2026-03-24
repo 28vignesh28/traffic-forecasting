@@ -40,184 +40,184 @@ st.markdown("""
 /* ── Import Google Font ── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-/* ── Root variables ── */
+/* ── Root variables — Light / white theme ── */
 :root {
-    --bg-primary: #0a0e17;
-    --bg-secondary: #111827;
-    --bg-card: rgba(17, 24, 39, 0.85);
-    --border-card: rgba(99, 102, 241, 0.25);
-    --accent-indigo: #6366f1;
-    --accent-cyan: #22d3ee;
-    --accent-emerald: #10b981;
-    --accent-amber: #f59e0b;
-    --accent-rose: #f43f5e;
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --glass: rgba(255,255,255,0.04);
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-card: #ffffff;
+    --border-card: #e2e8f0;
+    --accent-indigo: #4f46e5;
+    --accent-cyan: #0891b2;
+    --accent-emerald: #059669;
+    --accent-amber: #d97706;
+    --accent-rose: #e11d48;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
 }
 
-/* ── Global ── */
+/* ── Global — larger base font ── */
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif !important;
+    font-size: 18px !important;
+    color: #1e293b !important;
 }
 .stApp {
-    background: linear-gradient(135deg, #0a0e17 0%, #1a1a2e 40%, #16213e 100%);
+    background: #ffffff !important;
 }
 
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #111827 0%, #0f172a 100%) !important;
-    border-right: 1px solid rgba(99,102,241,0.2);
+    background: #f8fafc !important;
+    border-right: 1px solid #e2e8f0;
 }
 section[data-testid="stSidebar"] .stSelectbox label,
 section[data-testid="stSidebar"] .stDateInput label,
 section[data-testid="stSidebar"] .stTimeInput label,
 section[data-testid="stSidebar"] .stNumberInput label {
-    color: #cbd5e1 !important;
-    font-weight: 500 !important;
-    font-size: 0.85rem !important;
+    color: #334155 !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
 }
 
 /* ── Metric cards ── */
 .metric-card {
-    background: linear-gradient(135deg, rgba(17,24,39,0.9) 0%, rgba(30,41,59,0.8) 100%);
-    border: 1px solid rgba(99,102,241,0.2);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 16px;
-    padding: 24px 28px;
-    backdrop-filter: blur(12px);
+    padding: 28px 32px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
 }
 .metric-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 32px rgba(99,102,241,0.18);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 .metric-label {
-    color: #94a3b8;
-    font-size: 0.78rem;
+    color: #64748b;
+    font-size: 0.95rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin-bottom: 4px;
-    font-weight: 600;
+    margin-bottom: 6px;
+    font-weight: 700;
 }
 .metric-value {
-    color: #f1f5f9;
-    font-size: 1.85rem;
+    color: #1e293b;
+    font-size: 2.2rem;
     font-weight: 700;
     line-height: 1.2;
 }
 .metric-sub {
-    color: #64748b;
-    font-size: 0.75rem;
-    margin-top: 4px;
+    color: #94a3b8;
+    font-size: 0.9rem;
+    margin-top: 6px;
 }
 
 /* ── Congestion badges ── */
 .badge {
     display: inline-block;
-    padding: 6px 18px;
+    padding: 8px 22px;
     border-radius: 20px;
-    font-weight: 600;
-    font-size: 0.82rem;
+    font-weight: 700;
+    font-size: 1rem;
     letter-spacing: 0.03em;
 }
 .badge-green {
-    background: rgba(16,185,129,0.15);
-    color: #34d399;
-    border: 1px solid rgba(16,185,129,0.35);
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
 }
 .badge-yellow {
-    background: rgba(245,158,11,0.15);
-    color: #fbbf24;
-    border: 1px solid rgba(245,158,11,0.35);
+    background: #fffbeb;
+    color: #d97706;
+    border: 1px solid #fde68a;
 }
 .badge-red {
-    background: rgba(244,63,94,0.15);
-    color: #fb7185;
-    border: 1px solid rgba(244,63,94,0.35);
+    background: #fff1f2;
+    color: #e11d48;
+    border: 1px solid #fecdd3;
 }
 
 /* ── Header ── */
 .dashboard-header {
-    background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(34,211,238,0.08) 100%);
-    border: 1px solid rgba(99,102,241,0.2);
+    background: linear-gradient(135deg, #eef2ff 0%, #ecfeff 100%);
+    border: 1px solid #e2e8f0;
     border-radius: 20px;
-    padding: 32px 40px;
-    margin-bottom: 24px;
+    padding: 36px 44px;
+    margin-bottom: 28px;
     text-align: center;
-    backdrop-filter: blur(16px);
 }
 .dashboard-header h1 {
-    background: linear-gradient(135deg, #818cf8, #22d3ee);
+    background: linear-gradient(135deg, #4f46e5, #0891b2);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    font-size: 2.1rem;
+    font-size: 2.6rem;
     font-weight: 800;
     margin: 0;
     letter-spacing: -0.02em;
 }
 .dashboard-header p {
-    color: #94a3b8;
-    font-size: 0.95rem;
-    margin-top: 6px;
+    color: #64748b;
+    font-size: 1.15rem;
+    margin-top: 8px;
     font-weight: 400;
 }
 
 /* ── Section header ── */
 .section-header {
-    color: #cbd5e1;
-    font-size: 0.82rem;
+    color: #334155;
+    font-size: 1.05rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-weight: 700;
-    margin: 20px 0 10px 0;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(99,102,241,0.15);
+    margin: 24px 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
 }
 
 /* ── AI insight card ── */
 .insight-card {
-    background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(34,211,238,0.06) 100%);
-    border-left: 3px solid #6366f1;
+    background: #f8fafc;
+    border-left: 4px solid #4f46e5;
     border-radius: 0 12px 12px 0;
-    padding: 14px 18px;
-    margin: 8px 0;
-    color: #cbd5e1;
-    font-size: 0.88rem;
-    line-height: 1.5;
+    padding: 16px 22px;
+    margin: 10px 0;
+    color: #334155;
+    font-size: 1.05rem;
+    line-height: 1.6;
 }
 
 /* ── Weather card ── */
 .weather-card {
-    background: linear-gradient(135deg, rgba(34,211,238,0.08) 0%, rgba(16,185,129,0.05) 100%);
-    border: 1px solid rgba(34,211,238,0.2);
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
     border-radius: 16px;
-    padding: 20px 24px;
+    padding: 24px 28px;
     text-align: center;
 }
-.weather-icon { font-size: 2.2rem; margin-bottom: 4px; }
-.weather-temp { font-size: 1.6rem; font-weight: 700; color: #f1f5f9; }
-.weather-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+.weather-icon { font-size: 2.6rem; margin-bottom: 6px; }
+.weather-temp { font-size: 2rem; font-weight: 700; color: #1e293b; }
+.weather-label { font-size: 0.9rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; font-weight: 600; }
 
 /* ── Holiday pill ── */
 .holiday-pill {
     display: inline-block;
-    padding: 8px 20px;
+    padding: 10px 24px;
     border-radius: 24px;
-    font-weight: 600;
-    font-size: 0.85rem;
+    font-weight: 700;
+    font-size: 1rem;
 }
 .holiday-yes {
-    background: rgba(245,158,11,0.15);
-    color: #fbbf24;
-    border: 1px solid rgba(245,158,11,0.3);
+    background: #fffbeb;
+    color: #d97706;
+    border: 1px solid #fde68a;
 }
 .holiday-no {
-    background: rgba(16,185,129,0.12);
-    color: #6ee7b7;
-    border: 1px solid rgba(16,185,129,0.25);
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
 }
 
 /* ── Animated pulse for live indicator ── */
@@ -227,18 +227,18 @@ section[data-testid="stSidebar"] .stNumberInput label {
 }
 .live-dot {
     display: inline-block;
-    width: 8px; height: 8px;
+    width: 10px; height: 10px;
     border-radius: 50%;
-    background: #10b981;
+    background: #059669;
     animation: pulse 2s infinite;
-    margin-right: 6px;
+    margin-right: 8px;
     vertical-align: middle;
 }
 
 /* ── Change indicator arrows ── */
-.change-up { color: #f43f5e; font-weight: 700; }
-.change-down { color: #10b981; font-weight: 700; }
-.change-neutral { color: #94a3b8; font-weight: 600; }
+.change-up { color: #e11d48; font-weight: 700; font-size: 1.1rem; }
+.change-down { color: #059669; font-weight: 700; font-size: 1.1rem; }
+.change-neutral { color: #64748b; font-weight: 600; font-size: 1.1rem; }
 
 /* ── Hide default Streamlit branding ── */
 #MainMenu {visibility: hidden;}
@@ -249,7 +249,7 @@ header {visibility: hidden;}
 .stPlotlyChart {
     border-radius: 16px;
     overflow: hidden;
-    border: 1px solid rgba(99,102,241,0.15);
+    border: 1px solid #e2e8f0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -518,10 +518,10 @@ st.markdown("""
 # ──────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style="text-align:center; padding: 12px 0 18px 0;">
-        <span style="font-size:1.6rem;">🎛️</span>
-        <div style="color:#cbd5e1; font-size:1.05rem; font-weight:700; letter-spacing:0.04em; margin-top:4px;">Control Panel</div>
-        <div style="color:#64748b; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.1em;">Smart Traffic Monitoring</div>
+    <div style="text-align:center; padding: 14px 0 20px 0;">
+        <span style="font-size:1.8rem;">🎛️</span>
+        <div style="color:#1e293b; font-size:1.2rem; font-weight:700; letter-spacing:0.04em; margin-top:4px;">Control Panel</div>
+        <div style="color:#64748b; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.1em;">Smart Traffic Monitoring</div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("---")
@@ -558,11 +558,11 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(f"""
-    <div style="color:#475569; font-size:0.7rem; text-align:center; line-height:1.6;">
-        <strong style="color:#64748b;">Model:</strong> CADGT v1.0<br>
-        <strong style="color:#64748b;">Dataset:</strong> METR-LA<br>
-        <strong style="color:#64748b;">Sensors:</strong> 207 nodes<br>
-        <strong style="color:#64748b;">Device:</strong> {'CUDA' if device.type == 'cuda' else 'CPU'}
+    <div style="color:#475569; font-size:0.9rem; text-align:center; line-height:1.8;">
+        <strong style="color:#334155;">Model:</strong> CADGT v1.0<br>
+        <strong style="color:#334155;">Dataset:</strong> METR-LA<br>
+        <strong style="color:#334155;">Sensors:</strong> 207 nodes<br>
+        <strong style="color:#334155;">Device:</strong> {'CUDA' if device.type == 'cuda' else 'CPU'}
     </div>
     """, unsafe_allow_html=True)
 
@@ -635,7 +635,7 @@ with col1:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Predicted Speed</div>
-        <div class="metric-value">{pred_speed:.1f} <span style="font-size:0.9rem;color:#64748b;">mph</span></div>
+        <div class="metric-value">{pred_speed:.1f} <span style="font-size:1.1rem;color:#64748b;">mph</span></div>
         <div class="metric-sub">@ {sel_horizon_label} horizon</div>
     </div>
     """, unsafe_allow_html=True)
@@ -663,7 +663,7 @@ with col4:
     <div class="metric-card">
         <div class="metric-label">Congestion Level</div>
         <div style="margin-top:8px;">
-            <span style="font-size:1.5rem;">{congestion_icon}</span>
+            <span style="font-size:1.8rem;">{congestion_icon}</span>
             <span class="badge {congestion_badge}" style="margin-left:6px;">{congestion_label}</span>
         </div>
         <div class="metric-sub">Based on predicted speed</div>
@@ -691,11 +691,11 @@ with info_col:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Actual Speed</div>
-            <div class="metric-value" style="font-size:1.4rem;">{actual_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
+            <div class="metric-value" style="font-size:1.7rem;">{actual_speed:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
         </div>
         <div class="metric-card">
             <div class="metric-label">Predicted Speed</div>
-            <div class="metric-value" style="font-size:1.4rem;">{pred_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
+            <div class="metric-value" style="font-size:1.7rem;">{pred_speed:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
         </div>
         <div class="metric-card">
             <div class="metric-label">Traffic Change</div>
@@ -706,8 +706,8 @@ with info_col:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Predicted Speed</div>
-            <div class="metric-value" style="font-size:1.4rem;">{pred_speed:.1f} <span style="font-size:0.8rem;color:#64748b;">mph</span></div>
-            <div class="metric-sub" style="margin-top:8px;color:#f59e0b;">
+            <div class="metric-value" style="font-size:1.7rem;">{pred_speed:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
+            <div class="metric-sub" style="margin-top:8px;color:#d97706;">
                 ⚠️ Actual data not available for this timestamp.
             </div>
         </div>
@@ -736,7 +736,7 @@ with w2:
     st.markdown(f"""
     <div class="weather-card">
         <div class="weather-icon">🌤️</div>
-        <div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['type']}</div>
+        <div style="font-size:1.2rem;font-weight:600;color:#1e293b;margin-top:4px;">{weather_info['type']}</div>
         <div class="weather-label">Weather Type</div>
     </div>
     """, unsafe_allow_html=True)
@@ -745,7 +745,7 @@ with w3:
     st.markdown(f"""
     <div class="weather-card">
         <div class="weather-icon">💧</div>
-        <div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['precip']}</div>
+        <div style="font-size:1.2rem;font-weight:600;color:#1e293b;margin-top:4px;">{weather_info['precip']}</div>
         <div class="weather-label">Precipitation</div>
     </div>
     """, unsafe_allow_html=True)
@@ -754,7 +754,7 @@ with w4:
     st.markdown(f"""
     <div class="weather-card">
         <div class="weather-icon">💨</div>
-        <div style="font-size:1.1rem;font-weight:600;color:#f1f5f9;margin-top:4px;">{weather_info['wind']}</div>
+        <div style="font-size:1.2rem;font-weight:600;color:#1e293b;margin-top:4px;">{weather_info['wind']}</div>
         <div class="weather-label">Wind Speed</div>
     </div>
     """, unsafe_allow_html=True)
@@ -775,7 +775,7 @@ with w5:
 
 # ── Footer ──
 st.markdown("""
-<div style="text-align:center; padding:30px 0 10px 0; color:#475569; font-size:0.72rem; letter-spacing:0.04em;">
+<div style="text-align:center; padding:30px 0 10px 0; color:#64748b; font-size:0.9rem; letter-spacing:0.04em;">
     Traffic Flow Forecasting &amp; Congestion Behaviour Analysis &nbsp;•&nbsp; CADGT &nbsp;•&nbsp; METR-LA Dataset<br>
     Context-Aware Dynamic Graph Transformer &nbsp;|&nbsp; Intelligent Transportation System
 </div>
