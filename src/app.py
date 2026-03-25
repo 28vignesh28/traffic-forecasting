@@ -40,29 +40,34 @@ st.markdown("""
 /* ── Import Google Font ── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-/* ── Root variables — Light / white theme ── */
+/* ── Root variables — High-contrast screenshot-friendly theme ── */
 :root {
     --bg-primary: #ffffff;
     --bg-secondary: #f8fafc;
     --bg-card: #ffffff;
-    --border-card: #e2e8f0;
-    --accent-indigo: #4f46e5;
-    --accent-cyan: #0891b2;
-    --accent-emerald: #059669;
-    --accent-amber: #d97706;
-    --accent-rose: #e11d48;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
+    --border-card: #c0c0c0;
+    --accent-indigo: #000000;
+    --accent-cyan: #000000;
+    --accent-emerald: #000000;
+    --accent-amber: #000000;
+    --accent-rose: #000000;
+    --text-primary: #000000;
+    --text-secondary: #000000;
 }
 
-/* ── Global — larger base font ── */
+/* ── Global — larger base font, all black & bold for screenshots ── */
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif !important;
     font-size: 18px !important;
-    color: #1e293b !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
 }
 .stApp {
     background: #ffffff !important;
+}
+p, span, div, label, li, td, th, h1, h2, h3, h4, h5, h6 {
+    color: #000000 !important;
+    font-weight: 700 !important;
 }
 
 /* ── Sidebar ── */
@@ -74,11 +79,35 @@ section[data-testid="stSidebar"] .stSelectbox label,
 section[data-testid="stSidebar"] .stDateInput label,
 section[data-testid="stSidebar"] .stTimeInput label,
 section[data-testid="stSidebar"] .stNumberInput label {
-    color: #334155 !important;
-    font-weight: 600 !important;
+    color: #000000 !important;
+    font-weight: 800 !important;
     font-size: 1rem !important;
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
+}
+
+/* ── Make date/time/select input values bold ── */
+section[data-testid="stSidebar"] .stDateInput input,
+section[data-testid="stSidebar"] .stTimeInput input,
+section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] span,
+section[data-testid="stSidebar"] .stNumberInput input {
+    color: #000000 !important;
+    font-weight: 800 !important;
+    font-size: 1.05rem !important;
+}
+
+/* ── Force Streamlit columns equal height ── */
+[data-testid="stHorizontalBlock"] {
+    align-items: stretch !important;
+}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    display: flex !important;
+    flex-direction: column !important;
+}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 /* ── Metric cards ── */
@@ -90,29 +119,34 @@ section[data-testid="stSidebar"] .stNumberInput label {
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     margin-bottom: 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 .metric-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 .metric-label {
-    color: #64748b;
+    color: #000000;
     font-size: 0.95rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin-bottom: 6px;
-    font-weight: 700;
+    font-weight: 800;
 }
 .metric-value {
-    color: #1e293b;
+    color: #000000;
     font-size: 2.2rem;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.2;
 }
 .metric-sub {
-    color: #94a3b8;
+    color: #000000;
     font-size: 0.9rem;
     margin-top: 6px;
+    font-weight: 700;
 }
 
 /* ── Congestion badges ── */
@@ -126,18 +160,18 @@ section[data-testid="stSidebar"] .stNumberInput label {
 }
 .badge-green {
     background: #ecfdf5;
-    color: #059669;
-    border: 1px solid #a7f3d0;
+    color: #000000;
+    border: 2px solid #059669;
 }
 .badge-yellow {
     background: #fffbeb;
-    color: #d97706;
-    border: 1px solid #fde68a;
+    color: #000000;
+    border: 2px solid #d97706;
 }
 .badge-red {
     background: #fff1f2;
-    color: #e11d48;
-    border: 1px solid #fecdd3;
+    color: #000000;
+    border: 2px solid #e11d48;
 }
 
 /* ── Header ── */
@@ -150,43 +184,45 @@ section[data-testid="stSidebar"] .stNumberInput label {
     text-align: center;
 }
 .dashboard-header h1 {
-    background: linear-gradient(135deg, #4f46e5, #0891b2);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: #000000;
+    color: #000000;
     font-size: 2.6rem;
-    font-weight: 800;
+    font-weight: 900;
     margin: 0;
     letter-spacing: -0.02em;
 }
 .dashboard-header p {
-    color: #64748b;
+    color: #000000;
     font-size: 1.15rem;
     margin-top: 8px;
-    font-weight: 400;
+    font-weight: 700;
 }
 
 /* ── Section header ── */
 .section-header {
-    color: #334155;
+    color: #000000;
     font-size: 1.05rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    font-weight: 700;
+    font-weight: 800;
     margin: 24px 0 12px 0;
     padding-bottom: 8px;
-    border-bottom: 2px solid #e2e8f0;
+    border-bottom: 2px solid #000000;
 }
 
 /* ── AI insight card ── */
 .insight-card {
     background: #f8fafc;
-    border-left: 4px solid #4f46e5;
+    border-left: 4px solid #000000;
     border-radius: 0 12px 12px 0;
     padding: 16px 22px;
     margin: 10px 0;
-    color: #334155;
+    color: #000000;
     font-size: 1.05rem;
     line-height: 1.6;
+    font-weight: 700;
 }
 
 /* ── Weather card ── */
@@ -203,9 +239,9 @@ section[data-testid="stSidebar"] .stNumberInput label {
     justify-content: center;
 }
 .weather-icon { font-size: 2.6rem; margin-bottom: 6px; }
-.weather-temp { font-size: 2rem; font-weight: 700; color: #1e293b; }
-.weather-value { font-size: 1.2rem; font-weight: 600; color: #1e293b; margin-top: 4px; }
-.weather-label { font-size: 0.9rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; font-weight: 600; }
+.weather-temp { font-size: 2rem; font-weight: 800; color: #000000; }
+.weather-value { font-size: 1.2rem; font-weight: 800; color: #000000; margin-top: 4px; }
+.weather-label { font-size: 0.9rem; color: #000000; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; font-weight: 800; }
 
 /* ── Holiday pill ── */
 .holiday-pill {
@@ -217,13 +253,13 @@ section[data-testid="stSidebar"] .stNumberInput label {
 }
 .holiday-yes {
     background: #fffbeb;
-    color: #d97706;
-    border: 1px solid #fde68a;
+    color: #000000;
+    border: 2px solid #d97706;
 }
 .holiday-no {
     background: #ecfdf5;
-    color: #059669;
-    border: 1px solid #a7f3d0;
+    color: #000000;
+    border: 2px solid #059669;
 }
 
 /* ── Animated pulse for live indicator ── */
@@ -242,11 +278,11 @@ section[data-testid="stSidebar"] .stNumberInput label {
 }
 
 /* ── Change indicator arrows ── */
-.change-up { color: #e11d48; font-weight: 700; font-size: 1.1rem; }
-.change-down { color: #059669; font-weight: 700; font-size: 1.1rem; }
-.change-neutral { color: #64748b; font-weight: 600; font-size: 1.1rem; }
+.change-up { color: #000000; font-weight: 800; font-size: 1.1rem; }
+.change-down { color: #000000; font-weight: 800; font-size: 1.1rem; }
+.change-neutral { color: #000000; font-weight: 800; font-size: 1.1rem; }
 
-/* ── Hide default Streamlit branding ── */
+/* ── Hide default Streamlit branding & deploy button ── */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header[data-testid="stHeader"] {
@@ -255,6 +291,9 @@ header[data-testid="stHeader"] {
 /* Hide the header decoration but keep the sidebar toggle button */
 header[data-testid="stHeader"]::after {
     display: none;
+}
+[data-testid="stToolbar"] {
+    display: none !important;
 }
 
 /* ── Plotly container rounding ── */
@@ -532,8 +571,8 @@ with st.sidebar:
     st.markdown("""
     <div style="text-align:center; padding: 14px 0 20px 0;">
         <span style="font-size:1.8rem;">🎛️</span>
-        <div style="color:#1e293b; font-size:1.2rem; font-weight:700; letter-spacing:0.04em; margin-top:4px;">Control Panel</div>
-        <div style="color:#64748b; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.1em;">Smart Traffic Monitoring</div>
+        <div style="color:#000000; font-size:1.2rem; font-weight:800; letter-spacing:0.04em; margin-top:4px;">Control Panel</div>
+        <div style="color:#000000; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.1em; font-weight:700;">Smart Traffic Monitoring</div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("---")
@@ -575,11 +614,11 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(f"""
-    <div style="color:#475569; font-size:0.9rem; text-align:center; line-height:1.8;">
-        <strong style="color:#334155;">Model:</strong> CADGT v1.0<br>
-        <strong style="color:#334155;">Dataset:</strong> METR-LA<br>
-        <strong style="color:#334155;">Sensors:</strong> 207 nodes<br>
-        <strong style="color:#334155;">Device:</strong> {'CUDA' if device.type == 'cuda' else 'CPU'}
+    <div style="color:#000000; font-size:0.9rem; text-align:center; line-height:1.8; font-weight:700;">
+        <strong style="color:#000000;">Model:</strong> CADGT v1.0<br>
+        <strong style="color:#000000;">Dataset:</strong> METR-LA<br>
+        <strong style="color:#000000;">Sensors:</strong> 207 nodes<br>
+        <strong style="color:#000000;">Device:</strong> {'CUDA' if device.type == 'cuda' else 'CPU'}
     </div>
     """, unsafe_allow_html=True)
 
@@ -652,7 +691,7 @@ with col1:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Predicted Speed</div>
-        <div class="metric-value">{pred_speed:.1f} <span style="font-size:1.1rem;color:#64748b;">mph</span></div>
+        <div class="metric-value">{pred_speed:.1f} <span style="font-size:1.1rem;color:#000000;font-weight:800;">mph</span></div>
         <div class="metric-sub">@ {sel_horizon_label} horizon</div>
     </div>
     """, unsafe_allow_html=True)
@@ -679,10 +718,7 @@ with col4:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Congestion Level</div>
-        <div style="margin-top:8px;">
-            <span style="font-size:1.8rem;">{congestion_icon}</span>
-            <span class="badge {congestion_badge}" style="margin-left:6px;">{congestion_label}</span>
-        </div>
+        <div class="metric-value" style="font-size:1.8rem;">{congestion_icon} <span class="badge {congestion_badge}">{congestion_label}</span></div>
         <div class="metric-sub">Based on predicted speed</div>
     </div>
     """, unsafe_allow_html=True)
@@ -708,11 +744,11 @@ with info_col:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Actual Speed</div>
-            <div class="metric-value" style="font-size:1.7rem;">{actual_speed:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
+            <div class="metric-value" style="font-size:1.7rem;">{actual_speed:.1f} <span style="font-size:1rem;color:#000000;font-weight:800;">mph</span></div>
         </div>
         <div class="metric-card">
             <div class="metric-label">Predicted Speed</div>
-            <div class="metric-value" style="font-size:1.7rem;">{pred_speed:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
+            <div class="metric-value" style="font-size:1.7rem;">{pred_speed:.1f} <span style="font-size:1rem;color:#000000;font-weight:800;">mph</span></div>
         </div>
         <div class="metric-card">
             <div class="metric-label">Traffic Change</div>
@@ -723,8 +759,8 @@ with info_col:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Predicted Speed</div>
-            <div class="metric-value" style="font-size:1.7rem;">{pred_speed:.1f} <span style="font-size:1rem;color:#64748b;">mph</span></div>
-            <div class="metric-sub" style="margin-top:8px;color:#d97706;">
+            <div class="metric-value" style="font-size:1.7rem;">{pred_speed:.1f} <span style="font-size:1rem;color:#000000;font-weight:800;">mph</span></div>
+            <div class="metric-sub" style="margin-top:8px;color:#000000;font-weight:700;">
                 ⚠️ Actual data not available for this timestamp.
             </div>
         </div>
@@ -792,7 +828,7 @@ with w5:
 
 # ── Footer ──
 st.markdown("""
-<div style="text-align:center; padding:30px 0 10px 0; color:#64748b; font-size:0.9rem; letter-spacing:0.04em;">
+<div style="text-align:center; padding:30px 0 10px 0; color:#000000; font-size:0.9rem; letter-spacing:0.04em; font-weight:700;">
     Traffic Flow Forecasting &amp; Congestion Behaviour Analysis &nbsp;•&nbsp; CADGT &nbsp;•&nbsp; METR-LA Dataset<br>
     Context-Aware Dynamic Graph Transformer &nbsp;|&nbsp; Intelligent Transportation System
 </div>
