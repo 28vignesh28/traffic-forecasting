@@ -6,17 +6,13 @@ import logging
 from datetime import datetime
 
 
-# =============================================================================
-# FIX #9: Reproducibility — set_seed() added
-# All randomness is seeded so results are fully reproducible across runs.
-# =============================================================================
 def set_seed(seed: int = 42):
     """Seed all RNG sources for full reproducibility."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    # Enforce deterministic algorithms where possible (may slow training slightly)
+
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -26,11 +22,10 @@ def masked_mae(preds, labels, null_val=0.0):
     if np.isnan(null_val):
         mask = ~torch.isnan(labels)
     else:
-        mask = (labels > null_val)
+        mask = labels > null_val
 
-    # FIX #41: Return NaN instead of 0.0 so data problems aren't hidden
     if mask.sum() == 0:
-        return torch.tensor(float('nan'))
+        return torch.tensor(float("nan"))
 
     mask = mask.float()
     loss = torch.abs(preds - labels)
@@ -39,18 +34,17 @@ def masked_mae(preds, labels, null_val=0.0):
 
 
 def masked_mape(preds, labels, null_val=0.0):
-    # FIX #42: Use same threshold as MAE for consistent sample filtering
+
     if np.isnan(null_val):
         mask = ~torch.isnan(labels)
     else:
-        mask = (labels > null_val)
+        mask = labels > null_val
 
-    # FIX #41: Return NaN instead of 0.0
     if mask.sum() == 0:
-        return torch.tensor(float('nan'))
+        return torch.tensor(float("nan"))
 
     mask = mask.float()
-    # Use a small epsilon only in the denominator to avoid division by zero
+
     loss = torch.abs((preds - labels) / (torch.abs(labels) + 1e-5))
     loss = loss * mask
     return (torch.sum(loss) / torch.sum(mask)) * 100
@@ -60,11 +54,10 @@ def masked_rmse(preds, labels, null_val=0.0):
     if np.isnan(null_val):
         mask = ~torch.isnan(labels)
     else:
-        mask = (labels > null_val)
+        mask = labels > null_val
 
-    # FIX #41: Return NaN instead of 0.0
     if mask.sum() == 0:
-        return torch.tensor(float('nan'))
+        return torch.tensor(float("nan"))
 
     mask = mask.float()
     loss = (preds - labels) ** 2
@@ -76,11 +69,10 @@ def masked_mse(preds, labels, null_val=0.0):
     if np.isnan(null_val):
         mask = ~torch.isnan(labels)
     else:
-        mask = (labels > null_val)
+        mask = labels > null_val
 
-    # FIX #41: Return NaN instead of 0.0
     if mask.sum() == 0:
-        return torch.tensor(float('nan'))
+        return torch.tensor(float("nan"))
 
     mask = mask.float()
     loss = (preds - labels) ** 2
@@ -94,16 +86,12 @@ def evaluate_metrics(y_true, y_pred, null_val=0.0):
     if isinstance(y_pred, np.ndarray):
         y_pred = torch.from_numpy(y_pred).float()
 
-    mae  = masked_mae(y_pred, y_true, null_val).item()
-    mse  = masked_mse(y_pred, y_true, null_val).item()
+    mae = masked_mae(y_pred, y_true, null_val).item()
+    mse = masked_mse(y_pred, y_true, null_val).item()
     rmse = masked_rmse(y_pred, y_true, null_val).item()
     mape = masked_mape(y_pred, y_true, null_val).item()
 
     return mae, mse, rmse, mape
-
-
-
-
 
 
 def create_directories():
@@ -119,7 +107,9 @@ def setup_logging(model_name):
     logger.setLevel(logging.INFO)
 
     if not logger.handlers:
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
         fh = logging.FileHandler(log_file)
         fh.setFormatter(formatter)
         logger.addHandler(fh)

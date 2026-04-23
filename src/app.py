@@ -13,18 +13,12 @@ import pandas as pd
 import torch
 import streamlit as st
 
-# ---------------------------------------------------------------------------
-# Ensure project root is on sys.path so model imports work
-# ---------------------------------------------------------------------------
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from models.cadgt import CADGT
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Page configuration
-# ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Traffic Flow Forecasting System",
     page_icon="🚦",
@@ -32,10 +26,9 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Custom CSS — premium smart-city theme
-# ──────────────────────────────────────────────────────────────────────────────
-st.markdown("""
+
+st.markdown(
+    """
 <style>
 /* ── Import Google Font ── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -72,28 +65,72 @@ p, span, div, label, li, td, th, h1, h2, h3, h4, h5, h6 {
 
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] {
-    background: #f8fafc !important;
+    background: linear-gradient(180deg, #f0f4ff 0%, #f8fafc 40%, #ffffff 100%) !important;
     border-right: 1px solid #e2e8f0;
+    padding-top: 0 !important;
 }
+section[data-testid="stSidebar"] > div:first-child {
+    padding-top: 1rem !important;
+}
+
+/* ── Sidebar labels ── */
 section[data-testid="stSidebar"] .stSelectbox label,
 section[data-testid="stSidebar"] .stDateInput label,
 section[data-testid="stSidebar"] .stTimeInput label,
 section[data-testid="stSidebar"] .stNumberInput label {
-    color: #000000 !important;
-    font-weight: 800 !important;
-    font-size: 1rem !important;
+    color: #334155 !important;
+    font-weight: 700 !important;
+    font-size: 0.82rem !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
+    letter-spacing: 0.08em !important;
+    margin-bottom: 4px !important;
 }
 
-/* ── Make date/time/select input values bold ── */
+/* ── Sidebar input fields — clean white with subtle border ── */
 section[data-testid="stSidebar"] .stDateInput input,
 section[data-testid="stSidebar"] .stTimeInput input,
-section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] span,
 section[data-testid="stSidebar"] .stNumberInput input {
-    color: #000000 !important;
-    font-weight: 800 !important;
-    font-size: 1.05rem !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+section[data-testid="stSidebar"] .stDateInput input:focus,
+section[data-testid="stSidebar"] .stTimeInput input:focus,
+section[data-testid="stSidebar"] .stNumberInput input:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important;
+    outline: none !important;
+}
+
+/* ── Sidebar select/dropdown — clean white ── */
+section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] {
+    background: #ffffff !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 10px !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"]:focus-within {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important;
+}
+section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] span {
+    color: #1e293b !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] svg {
+    fill: #64748b !important;
+}
+
+/* ── Sidebar divider ── */
+section[data-testid="stSidebar"] hr {
+    border-color: #e2e8f0 !important;
+    margin: 16px 0 !important;
 }
 
 /* ── Force Streamlit columns equal height ── */
@@ -303,19 +340,17 @@ header[data-testid="stHeader"]::after {
     border: 1px solid #e2e8f0;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Cached data loading helpers
-# ──────────────────────────────────────────────────────────────────────────────
 
 @st.cache_resource(show_spinner="Loading METR-LA traffic dataset…")
 def load_traffic_data():
     """Load the METR-LA HDF5 dataset and return DataFrame + raw array."""
     h5_path = os.path.join(PROJECT_ROOT, "data", "METR-LA.h5")
     df = pd.read_hdf(h5_path)
-    # Replace sensor-malfunction zeros with forward fill
+
     df_clean = df.replace(0, np.nan).ffill().bfill()
     return df_clean
 
@@ -336,7 +371,7 @@ def load_model():
         num_nodes=207,
         seq_len=12,
         future_len=12,
-        ctx_dim=9,   # 10 features - 1 (traffic)
+        ctx_dim=9,
         d_model=64,
         static_adj=adj_mx,
     ).to(device)
@@ -353,8 +388,12 @@ def load_model():
 def load_weather_cache():
     """Load the largest weather cache CSV."""
     data_dir = os.path.join(PROJECT_ROOT, "data")
-    # Pick the larger CSV (full dataset range)
-    candidates = [f for f in os.listdir(data_dir) if f.startswith("weather_cache_") and f.endswith(".csv")]
+
+    candidates = [
+        f
+        for f in os.listdir(data_dir)
+        if f.startswith("weather_cache_") and f.endswith(".csv")
+    ]
     if not candidates:
         return None
     largest = max(candidates, key=lambda f: os.path.getsize(os.path.join(data_dir, f)))
@@ -377,22 +416,25 @@ def load_holidays():
     return all_dates
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Feature engineering helpers (mirrors data_loader.py logic)
-# ──────────────────────────────────────────────────────────────────────────────
-
-def build_input_tensor(traffic_df, weather_df, holidays, target_ts, scaler_mean, scaler_std, num_nodes=207, window=12):
+def build_input_tensor(
+    traffic_df,
+    weather_df,
+    holidays,
+    target_ts,
+    scaler_mean,
+    scaler_std,
+    num_nodes=207,
+    window=12,
+):
     """
     Build the [1, 12, 207, 10] input tensor for CADGT from raw data.
     Returns (tensor, actual_timestamps, found_in_dataset).
     """
     timestamps = traffic_df.index
 
-    # Find closest timestamp in dataset
     idx = timestamps.searchsorted(target_ts)
     idx = min(idx, len(timestamps) - 1)
 
-    # We need `window` steps ending at idx
     start = max(0, idx - window + 1)
     end = idx + 1
     if end - start < window:
@@ -400,51 +442,48 @@ def build_input_tensor(traffic_df, weather_df, holidays, target_ts, scaler_mean,
         end = window
 
     actual_ts = timestamps[start:end]
-    traffic_slice = traffic_df.iloc[start:end].values.astype(np.float32)  # [W, N]
+    traffic_slice = traffic_df.iloc[start:end].values.astype(np.float32)
 
-    found_in_dataset = abs((timestamps[idx] - target_ts).total_seconds()) < 600  # within 10 min
+    found_in_dataset = abs((timestamps[idx] - target_ts).total_seconds()) < 600
 
-    # Normalize traffic
     traffic_norm = (traffic_slice - scaler_mean) / (scaler_std + 1e-5)
 
-    # --- Weather features [W, 4] ---
     if weather_df is not None and len(weather_df) > 0:
         weather_indexed = weather_df.set_index("time")
         weather_aligned = weather_indexed.reindex(actual_ts, method="nearest")
-        weather_feat = weather_aligned[["temperature_2m", "precipitation", "visibility", "windspeed_10m"]].values.astype(np.float32)
+        weather_feat = weather_aligned[
+            ["temperature_2m", "precipitation", "visibility", "windspeed_10m"]
+        ].values.astype(np.float32)
         weather_feat = np.nan_to_num(weather_feat, nan=0.0)
     else:
         weather_feat = np.zeros((window, 4), dtype=np.float32)
 
-    # Z-score normalize weather (use dataset-level rough stats)
     w_mean = weather_feat.mean(axis=0, keepdims=True)
     w_std = weather_feat.std(axis=0, keepdims=True) + 1e-5
     weather_feat = (weather_feat - w_mean) / w_std
 
-    # --- Holiday feature [W, 1] ---
     holiday_feat = np.zeros((window, 1), dtype=np.float32)
     for i, ts in enumerate(actual_ts):
         if ts.date() in holidays:
             holiday_feat[i] = 1.0
 
-    # --- Time features [W, 4] ---
     tod = ((actual_ts.hour * 60 + actual_ts.minute) // 5).values
     dow = actual_ts.dayofweek.values
     tod_sin = np.sin(2 * np.pi * tod / 288.0).reshape(-1, 1)
     tod_cos = np.cos(2 * np.pi * tod / 288.0).reshape(-1, 1)
     dow_sin = np.sin(2 * np.pi * dow / 7.0).reshape(-1, 1)
     dow_cos = np.cos(2 * np.pi * dow / 7.0).reshape(-1, 1)
-    time_feat = np.concatenate([tod_sin, tod_cos, dow_sin, dow_cos], axis=1).astype(np.float32)
+    time_feat = np.concatenate([tod_sin, tod_cos, dow_sin, dow_cos], axis=1).astype(
+        np.float32
+    )
 
-    # Broadcast to [W, N, feat]
-    traffic_3d = traffic_norm[:, :, None]  # [W, N, 1]
-    weather_3d = np.repeat(weather_feat[:, None, :], num_nodes, axis=1)  # [W, N, 4]
-    holiday_3d = np.repeat(holiday_feat[:, None, :], num_nodes, axis=1)  # [W, N, 1]
-    time_3d = np.repeat(time_feat[:, None, :], num_nodes, axis=1)  # [W, N, 4]
+    traffic_3d = traffic_norm[:, :, None]
+    weather_3d = np.repeat(weather_feat[:, None, :], num_nodes, axis=1)
+    holiday_3d = np.repeat(holiday_feat[:, None, :], num_nodes, axis=1)
+    time_3d = np.repeat(time_feat[:, None, :], num_nodes, axis=1)
 
-    # Concatenate: [W, N, 10] = 1 traffic + 4 weather + 1 holiday + 4 time
     X = np.concatenate([traffic_3d, weather_3d, holiday_3d, time_3d], axis=-1)
-    tensor = torch.FloatTensor(X).unsqueeze(0)  # [1, W, N, 10]
+    tensor = torch.FloatTensor(X).unsqueeze(0)
 
     return tensor, actual_ts, found_in_dataset
 
@@ -462,7 +501,14 @@ def get_congestion_info(speed_mph):
 def get_weather_display(weather_df, target_ts):
     """Get weather info nearest to the target timestamp."""
     if weather_df is None or len(weather_df) == 0:
-        return {"temp": "N/A", "type": "Unknown", "icon": "❓", "humidity": "N/A", "wind": "N/A", "precip": 0}
+        return {
+            "temp": "N/A",
+            "type": "Unknown",
+            "icon": "❓",
+            "humidity": "N/A",
+            "wind": "N/A",
+            "precip": 0,
+        }
 
     weather_indexed = weather_df.set_index("time")
     idx = weather_indexed.index.searchsorted(target_ts)
@@ -474,7 +520,6 @@ def get_weather_display(weather_df, target_ts):
     visibility = row.get("visibility", 10000)
     wind = row.get("windspeed_10m", 0)
 
-    # Determine weather type
     if precip > 2.0:
         wtype, icon = "Rainy", "🌧️"
     elif precip > 0.1:
@@ -501,95 +546,121 @@ def get_weather_display(weather_df, target_ts):
     }
 
 
-def generate_ai_insights(pred_speed, congestion_label, horizon_label, actual_speed=None, trend_speeds=None):
+def generate_ai_insights(
+    pred_speed, congestion_label, horizon_label, actual_speed=None, trend_speeds=None
+):
     """Generate intelligent AI insights based on prediction results."""
     insights = []
 
-    # Trend analysis
     if trend_speeds is not None and len(trend_speeds) > 2:
         first_half = np.mean(trend_speeds[: len(trend_speeds) // 2])
         second_half = np.mean(trend_speeds[len(trend_speeds) // 2 :])
         diff = second_half - first_half
         if diff > 2:
-            insights.append("📈 Traffic speed is expected to **increase** over the prediction window, suggesting improving conditions.")
+            insights.append(
+                "📈 Traffic speed is expected to **increase** over the prediction window, suggesting improving conditions."
+            )
         elif diff < -2:
-            insights.append("📉 Traffic speed is projected to **decrease**, indicating potential congestion build-up ahead.")
+            insights.append(
+                "📉 Traffic speed is projected to **decrease**, indicating potential congestion build-up ahead."
+            )
         else:
-            insights.append("📊 Traffic conditions remain **stable** throughout the forecast horizon.")
+            insights.append(
+                "📊 Traffic conditions remain **stable** throughout the forecast horizon."
+            )
 
-    # Congestion-based
     if congestion_label == "Heavy Congestion":
-        insights.append("🚨 **Heavy congestion** detected near this sensor. Consider alternative routes or delayed departure.")
+        insights.append(
+            "🚨 **Heavy congestion** detected near this sensor. Consider alternative routes or delayed departure."
+        )
     elif congestion_label == "Moderate Traffic":
-        insights.append("⚠️ **Moderate congestion** likely near this sensor. Allow extra travel time for safety.")
+        insights.append(
+            "⚠️ **Moderate congestion** likely near this sensor. Allow extra travel time for safety."
+        )
     else:
-        insights.append("✅ **Free flow** conditions expected. Optimal time for travel through this corridor.")
+        insights.append(
+            "✅ **Free flow** conditions expected. Optimal time for travel through this corridor."
+        )
 
-    # Comparison insight
     if actual_speed is not None:
         change = pred_speed - actual_speed
         if abs(change) > 3:
             direction = "increase" if change > 0 else "decrease"
-            insights.append(f"🔮 Model predicts a **{abs(change):.1f} mph {direction}** compared to the actual recorded speed at this timestamp.")
+            insights.append(
+                f"🔮 Model predicts a **{abs(change):.1f} mph {direction}** compared to the actual recorded speed at this timestamp."
+            )
 
-    # Horizon-based
     if "60" in horizon_label:
-        insights.append("🕐 Long-range 60-minute forecast — predictions at this range have somewhat higher uncertainty.")
+        insights.append(
+            "🕐 Long-range 60-minute forecast — predictions at this range have somewhat higher uncertainty."
+        )
     elif "5" in horizon_label:
-        insights.append("⚡ Short-range 5-minute forecast — highest confidence prediction window.")
+        insights.append(
+            "⚡ Short-range 5-minute forecast — highest confidence prediction window."
+        )
 
     return insights
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Load all data
-# ──────────────────────────────────────────────────────────────────────────────
 traffic_df = load_traffic_data()
 model, device, scaler_mean, scaler_std = load_model()
 weather_df = load_weather_cache()
 holidays = load_holidays()
 
-# Dataset date range
+
 dataset_start = traffic_df.index[0].date()
 dataset_end = traffic_df.index[-1].date()
-sensor_ids = list(range(traffic_df.shape[1]))  # 0 to 206
+sensor_ids = list(range(traffic_df.shape[1]))
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Header
-# ──────────────────────────────────────────────────────────────────────────────
-st.markdown("""
+
+st.markdown(
+    """
 <div class="dashboard-header">
     <h1>🚦 Traffic Flow Forecasting System</h1>
     <p><span class="live-dot"></span> AI-powered traffic prediction using CADGT &nbsp;•&nbsp; METR-LA Dataset &nbsp;•&nbsp; 207 Sensors</p>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Sidebar — Input Controls
-# ──────────────────────────────────────────────────────────────────────────────
+
 with st.sidebar:
-    st.markdown("""
-    <div style="text-align:center; padding: 14px 0 20px 0;">
-        <span style="font-size:1.8rem;">🎛️</span>
-        <div style="color:#000000; font-size:1.2rem; font-weight:800; letter-spacing:0.04em; margin-top:4px;">Control Panel</div>
-        <div style="color:#000000; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.1em; font-weight:700;">Smart Traffic Monitoring</div>
+    st.markdown(
+        """
+    <div style="text-align:center; padding: 20px 10px 16px 10px;">
+        <div style="
+            display:inline-flex; align-items:center; justify-content:center;
+            width:52px; height:52px; border-radius:14px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            margin-bottom:10px; box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+        ">
+            <span style="font-size:1.5rem; line-height:1;">🎛️</span>
+        </div>
+        <div style="color:#1e293b; font-size:1.15rem; font-weight:800; letter-spacing:0.02em; margin-top:2px;">Control Panel</div>
+        <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; font-weight:600; margin-top:4px;">Smart Traffic Monitoring</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
     st.markdown("---")
 
     sel_date = st.date_input(
-        "📅 Select Date",
+        "📅 Date",
         value=datetime.date(2012, 4, 15),
         min_value=dataset_start,
         max_value=dataset_end,
         help=f"METR-LA range: {dataset_start} to {dataset_end}",
     )
 
-    sel_time = st.time_input(
-        "🕐 Select Time",
-        value=datetime.time(8, 00),
-        step=datetime.timedelta(minutes=5),
+    time_options = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 5)]
+    sel_time_str = st.selectbox(
+        "🕐 Time",
+        options=time_options,
+        index=time_options.index("08:00"),
         help="24-hour format, 5-minute intervals",
+    )
+    sel_time = datetime.time(
+        int(sel_time_str.split(":")[0]), int(sel_time_str.split(":")[1])
     )
 
     sel_sensor = st.selectbox(
@@ -598,150 +669,198 @@ with st.sidebar:
         index=91,
         help=(
             "Select a traffic sensor from the METR-LA network (0–206). "
-            "Each sensor corresponds to a loop-detector station on the Los Angeles County highway system. "
-            "The METR-LA dataset contains 207 sensors spread across major freeways (I-5, I-10, I-101, I-405, etc.). "
-            "Different sensor IDs capture traffic at different geographic locations, so predictions vary by sensor."
+            "Each sensor corresponds to a loop-detector station on the Los Angeles County highway system."
         ),
     )
 
     horizon_map = {"5 minutes": 0, "15 minutes": 2, "30 minutes": 5, "60 minutes": 11}
     sel_horizon_label = st.selectbox(
-        "🎯 Prediction Horizon",
+        "🎯 Horizon",
         options=list(horizon_map.keys()),
         index=1,
     )
     sel_horizon_idx = horizon_map[sel_horizon_label]
 
     st.markdown("---")
-    st.markdown(f"""
-    <div style="color:#000000; font-size:0.9rem; text-align:center; line-height:1.8; font-weight:700;">
-        <strong style="color:#000000;">Model:</strong> CADGT v1.0<br>
-        <strong style="color:#000000;">Dataset:</strong> METR-LA<br>
-        <strong style="color:#000000;">Sensors:</strong> 207 nodes<br>
-        <strong style="color:#000000;">Device:</strong> {'CUDA' if device.type == 'cuda' else 'CPU'}
-    </div>
-    """, unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Run prediction (auto-triggers on any input change)
-# ──────────────────────────────────────────────────────────────────────────────
+    device_label = "CUDA" if device.type == "cuda" else "CPU"
+    device_color = "#059669" if device.type == "cuda" else "#6366f1"
+    st.markdown(
+        f"""
+    <div style="
+        background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;
+        padding: 16px 18px; margin-top: 4px;
+    ">
+        <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.1em; color:#94a3b8; font-weight:700; margin-bottom:10px;">System Info</div>
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <span style="
+                display:inline-block; padding:4px 10px; border-radius:6px;
+                background:#f0f4ff; color:#4338ca; font-size:0.78rem; font-weight:700;
+            ">CADGT v1.0</span>
+            <span style="
+                display:inline-block; padding:4px 10px; border-radius:6px;
+                background:#f0fdf4; color:#059669; font-size:0.78rem; font-weight:700;
+            ">METR-LA</span>
+            <span style="
+                display:inline-block; padding:4px 10px; border-radius:6px;
+                background:#fef3c7; color:#b45309; font-size:0.78rem; font-weight:700;
+            ">207 Sensors</span>
+            <span style="
+                display:inline-block; padding:4px 10px; border-radius:6px;
+                background:{('#ecfdf5' if device.type == 'cuda' else '#f0f4ff')};
+                color:{device_color}; font-size:0.78rem; font-weight:700;
+            ">{device_label}</span>
+        </div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+
+
 target_datetime = datetime.datetime.combine(sel_date, sel_time)
 target_ts = pd.Timestamp(target_datetime)
 
-# Build input and run model
+
 input_tensor, actual_timestamps, found_in_dataset = build_input_tensor(
     traffic_df, weather_df, holidays, target_ts, scaler_mean, scaler_std
 )
 
 with torch.no_grad():
     input_tensor_dev = input_tensor.to(device)
-    preds_raw = model(input_tensor_dev)  # [1, 12, 207]
-    preds_np = preds_raw.cpu().numpy()[0]  # [12, 207]
+    preds_raw = model(input_tensor_dev)
+    preds_np = preds_raw.cpu().numpy()[0]
 
-# Inverse transform to mph then convert to mph
+
 preds_mph = preds_np * scaler_std + scaler_mean
-preds_mph_array = preds_mph  # kept as mph
+preds_mph_array = preds_mph
 
-# Target sensor predicted speeds (all horizons)
-sensor_preds_mph_array = preds_mph_array[:, sel_sensor]  # [12]
+
+sensor_preds_mph_array = preds_mph_array[:, sel_sensor]
 pred_speed = float(sensor_preds_mph_array[sel_horizon_idx])
 
-# Actual speed (if available)
+
 actual_speed = None
 if found_in_dataset:
-    # Get the actual speed at the target timestamp + horizon offset
-    horizon_offset = (sel_horizon_idx + 1) * 5  # minutes
+
+    horizon_offset = (sel_horizon_idx + 1) * 5
     future_ts = target_ts + pd.Timedelta(minutes=horizon_offset)
     if future_ts in traffic_df.index:
         actual_mph = float(traffic_df.loc[future_ts].iloc[sel_sensor])
-        actual_speed = actual_mph  # kept as mph
+        actual_speed = actual_mph
 
-# Also get actual historical speeds for the past window
+
 actual_history_mph = None
 if found_in_dataset:
-    history = traffic_df.iloc[
-        traffic_df.index.searchsorted(actual_timestamps[0]): traffic_df.index.searchsorted(actual_timestamps[-1]) + 1
-    ].iloc[:, sel_sensor].values # kept as mph
+    history = (
+        traffic_df.iloc[
+            traffic_df.index.searchsorted(
+                actual_timestamps[0]
+            ) : traffic_df.index.searchsorted(actual_timestamps[-1])
+            + 1
+        ]
+        .iloc[:, sel_sensor]
+        .values
+    )
     actual_history_mph = history
 
-# Congestion info
+
 congestion_label, congestion_badge, congestion_icon = get_congestion_info(pred_speed)
 
-# Weather info
+
 weather_info = get_weather_display(weather_df, target_ts)
 
-# Holiday check
+
 is_holiday = sel_date in holidays
 
-# AI insights
+
 insights = generate_ai_insights(
-    pred_speed, congestion_label, sel_horizon_label,
-    actual_speed=actual_speed, trend_speeds=sensor_preds_mph_array
+    pred_speed,
+    congestion_label,
+    sel_horizon_label,
+    actual_speed=actual_speed,
+    trend_speeds=sensor_preds_mph_array,
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
-# LAYOUT — Main dashboard panels
-# ──────────────────────────────────────────────────────────────────────────────
 
-# ── Row 1: Key Metrics ──
-st.markdown('<div class="section-header">📊 Prediction Results</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-header">📊 Prediction Results</div>', unsafe_allow_html=True
+)
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="metric-card">
         <div class="metric-label">Predicted Speed</div>
         <div class="metric-value">{pred_speed:.1f} <span style="font-size:1.1rem;color:#000000;font-weight:800;">mph</span></div>
         <div class="metric-sub">@ {sel_horizon_label} horizon</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with col2:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="metric-card">
         <div class="metric-label">Prediction Time</div>
         <div class="metric-value">{sel_time.strftime('%H:%M')}</div>
         <div class="metric-sub">{sel_date.strftime('%B %d, %Y')}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with col3:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="metric-card">
         <div class="metric-label">Sensor Station</div>
         <div class="metric-value">#{sel_sensor}</div>
         <div class="metric-sub">METR-LA network node</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with col4:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="metric-card">
         <div class="metric-label">Congestion Level</div>
         <div class="metric-value" style="font-size:1.8rem;">{congestion_icon} <span class="badge {congestion_badge}">{congestion_label}</span></div>
         <div class="metric-sub">Based on predicted speed</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
-# ── Row 2: Chart + Traffic Change / AI Insights ──
 info_col = st.container()
 
 
 with info_col:
-    # Traffic Change Analysis
-    st.markdown('<div class="section-header">🔄 Traffic Change Analysis</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        '<div class="section-header">🔄 Traffic Change Analysis</div>',
+        unsafe_allow_html=True,
+    )
 
     if actual_speed is not None:
         change = pred_speed - actual_speed
         if change > 0:
-            change_html = f'<span class="change-up">Increase (+{change:.1f} mph) ↑</span>'
+            change_html = (
+                f'<span class="change-up">Increase (+{change:.1f} mph) ↑</span>'
+            )
         elif change < 0:
-            change_html = f'<span class="change-down">Decrease ({change:.1f} mph) ↓</span>'
+            change_html = (
+                f'<span class="change-down">Decrease ({change:.1f} mph) ↓</span>'
+            )
         else:
             change_html = '<span class="change-neutral">No Change (0.0 mph) →</span>'
 
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div class="metric-card">
             <div class="metric-label">Actual Speed</div>
             <div class="metric-value" style="font-size:1.7rem;">{actual_speed:.1f} <span style="font-size:1rem;color:#000000;font-weight:800;">mph</span></div>
@@ -754,9 +873,12 @@ with info_col:
             <div class="metric-label">Traffic Change</div>
             <div style="margin-top:6px;">{change_html}</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
     else:
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div class="metric-card">
             <div class="metric-label">Predicted Speed</div>
             <div class="metric-value" style="font-size:1.7rem;">{pred_speed:.1f} <span style="font-size:1rem;color:#000000;font-weight:800;">mph</span></div>
@@ -764,72 +886,96 @@ with info_col:
                 ⚠️ Actual data not available for this timestamp.
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
-    # AI Insights
-    st.markdown('<div class="section-header">🤖 AI Traffic Insights</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-header">🤖 AI Traffic Insights</div>',
+        unsafe_allow_html=True,
+    )
     for insight in insights:
-        st.markdown(f'<div class="insight-card">{insight}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="insight-card">{insight}</div>', unsafe_allow_html=True
+        )
 
 
-# ── Row 3: Weather & Holiday ──
-st.markdown('<div class="section-header">🌍 Context Information</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-header">🌍 Context Information</div>', unsafe_allow_html=True
+)
 w1, w2, w3, w4, w5 = st.columns(5)
 
 with w1:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="weather-card">
         <div class="weather-icon">{weather_info['icon']}</div>
         <div class="weather-temp">{weather_info['temp']}</div>
         <div class="weather-label">Temperature</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with w2:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="weather-card">
         <div class="weather-icon">🌤️</div>
         <div class="weather-value">{weather_info['type']}</div>
         <div class="weather-label">Weather Type</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with w3:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="weather-card">
         <div class="weather-icon">💧</div>
         <div class="weather-value">{weather_info['precip']}</div>
         <div class="weather-label">Precipitation</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with w4:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="weather-card">
         <div class="weather-icon">💨</div>
         <div class="weather-value">{weather_info['wind']}</div>
         <div class="weather-label">Wind Speed</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 with w5:
     if is_holiday:
         pill = '<span class="holiday-pill holiday-yes">🎉 Holiday</span>'
     else:
         pill = '<span class="holiday-pill holiday-no">📋 Regular Day</span>'
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div class="weather-card">
         <div class="weather-icon">📅</div>
         <div>{pill}</div>
         <div class="weather-label">Holiday Status</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
-# ── Footer ──
-st.markdown("""
+st.markdown(
+    """
 <div style="text-align:center; padding:30px 0 10px 0; color:#000000; font-size:0.9rem; letter-spacing:0.04em; font-weight:700;">
     Traffic Flow Forecasting &amp; Congestion Behaviour Analysis &nbsp;•&nbsp; CADGT &nbsp;•&nbsp; METR-LA Dataset<br>
     Context-Aware Dynamic Graph Transformer &nbsp;|&nbsp; Intelligent Transportation System
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)

@@ -1,69 +1,128 @@
 # Unified Traffic Forecasting Pipeline
 
-This repository contains a unified, scalable, and standardized deep learning pipeline for evaluating four distinct traffic forecasting architectures under perfectly identical testing conditions:
-1. **CADGT** (Context-Aware Dynamic Graph Transformer)
-2. **CAMT-GATformer** (Context-Aware Multi-Task Graph Attention Transformer)
-3. **AMC-DSTGNN** (Adaptive Multi-Context Dynamic Spatial-Temporal Graph Neural Network)
-4. **ST-ACENet** (Spatial-Temporal Adaptive Context-Enhanced Network)
+This project provides a unified training and evaluation pipeline for four traffic forecasting models under identical data processing and metrics:
+1. CADGT (Context-Aware Dynamic Graph Transformer)
+2. CAMT-GATformer
+3. AMC-DSTGNN
+4. ST-ACENet
 
-By utilizing a single configuration and dataloader, we guarantee **zero data leakage**, completely standardized metrics evaluation, and identical input architectures across all models. The models natively consume exactly 10 features extracted simultaneously from raw traffic speed, local Open-Meteo weather parameters, public US Holidays, and cyclic temporal node encodings. 
+All models use the same dataloader, same feature set, and same evaluation logic so comparisons stay fair.
 
-## Project Architecture
+## Feature Set
+
+Each input timestep includes 10 features per sensor:
+1. Traffic speed
+2. Temperature
+3. Precipitation
+4. Visibility
+5. Wind speed
+6. Holiday indicator
+7. Time-of-day sine
+8. Time-of-day cosine
+9. Day-of-week sine
+10. Day-of-week cosine
+
+## Project Structure
 
 ```text
-c:/Users/vigne/Desktop/quadratic voting system/
+traffiic flow forecasting/
 ├── data/
-│   ├── METR-LA.h5              # Raw sequence traffic dataset
-│   └── adj_METR-LA.pkl         # Static distances / physical highway graph adj 
-├── models/                     # Core PyTorch nn.Module architectures
+│   ├── METR-LA.h5
+│   ├── holidays_cache.json
+│   └── weather_cache_*.csv
+├── models/
 │   ├── amc_dstgnn.py
 │   ├── cadgt.py
 │   ├── camt_gatformer.py
 │   └── st_acenet.py
-├── src/                        # The Unified Pipeline
-│   ├── config.yaml             # Single file tuning network hyperparams 
-│   ├── data_loader.py          # Enforces 10 identical input features for all models
-│   ├── test.py                 # Evaluates 60-Minute Horizon Model Checkpoints
-│   ├── train.py                # Runs generic epochs with automatic logging
-│   └── utils.py                # Standardized MAE/RMSE/R2 masking limits
-├── logs/                       # Automated standard-output execution history 
-├── saved_models/               # Location of successful compilation `.pth` best weights
-└── legacy_archive.zip          # The original unformatted project history
+├── src/
+│   ├── config.yaml
+│   ├── data_loader.py
+│   ├── train.py
+│   ├── test.py
+│   ├── app.py
+│   ├── simulation_case_study.py
+│   └── utils.py
+├── logs/
+├── saved_models/
+├── plot_metrics.py
+└── visualize.py
 ```
 
-## Running the Pipeline
+## Quick Setup
 
-All settings are localized inside `src/config.yaml`. To train any of the 4 networks, specify the abbreviation as the `--model` argument:
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-### 1. Training Parameters
-Ensure your hyper-parameters in `src/config.yaml` are set. The dataloader uses `training.window` (default 12) history to predict `training.horizon` (default 12) timesteps dynamically.
+## How to Demonstrate in Project Review
+
+### 1. Show Training Command
 
 ```bash
 python src/train.py --model CADGT
 ```
-*(Options: CADGT, CAMT, AMC_DSTGNN, ST_ACENet)*
 
-### 2. Evaluating 60-Minute Targets
-To calculate validation metrics explicitly masked for non-zero null sensors on your best saved checkpoint weights:
+Model options:
+- CADGT
+- CAMT
+- AMC_DSTGNN
+- ST_ACENet
+
+### 2. Show Evaluation Command
 
 ```bash
 python src/test.py --model CADGT
 ```
 
-### 3. Modifying the Input Stream
-Every feature ingested by a model passes through `src/data_loader.py > get_dataloaders()`. The unified standard features list includes: `[Traffic Speed, Temperature, Precipitation, Visibility, Wind Speed, IsHoliday, TOD_sin, TOD_cos, DOW_sin, DOW_cos]`. 
-If you add an 11th feature, update the initialization size configurations dynamically within `train.py`.
+This prints MAE, MSE, RMSE, and MAPE at 5/15/30/60-minute horizons.
 
-### 4. Quadratic Voting Ensemble
-After all 4 models are trained, combine their predictions using the Quadratic Voting ensemble:
+### 3. Show Interactive Dashboard
 
 ```bash
-python src/ensemble_qv.py
+streamlit run src/app.py
 ```
 
-**How QV works:** Each model receives a "voice credit" budget inversely proportional to its validation MAE. Under QV, casting *v* votes costs *v²* credits, so effective votes = `√(1/MAE)`. Models with lower error earn disproportionately more influence, but no single model can dominate — this is the core democratic property of QV.
+Use the sidebar to select:
+- date/time
+- sensor ID
+- horizon
 
-The script outputs a side-by-side comparison table of all individual models vs. the ensemble at 5/15/30/60-minute horizons.
+Then explain predicted speed, congestion level, and context-aware insights.
+
+### 4. Show Comparative Visualizations
+
+```bash
+python visualize.py --node 91 --horizon_idx 11
+python plot_metrics.py
+```
+
+Outputs are saved under visualizations.
+
+### 5. Optional Case Study Output
+
+```bash
+python src/simulation_case_study.py
+```
+
+This generates focused congestion-behavior plots and summary CSVs for presentation.
+
+## Configuration
+
+Main settings are in src/config.yaml:
+- training.window
+- training.horizon
+- training.batch_size
+- training.learning_rate
+- model_overrides
+
+## Notes
+
+- This README reflects files currently present in this repository.
+- Previous ensemble scripts are not part of the current src directory.
 
 ## License
+
 Provided for the Traffic Sequence Evaluation metrics review format.
